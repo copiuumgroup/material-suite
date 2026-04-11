@@ -1,0 +1,205 @@
+@import "tailwindcss";
+
+@theme {
+  --color-primary: var(--md-sys-color-primary);
+  --color-on-primary: var(--md-sys-color-on-primary);
+  --color-primary-container: var(--md-sys-color-primary-container);
+  --color-on-primary-container: var(--md-sys-color-on-primary-container);
+  --color-secondary: var(--md-sys-color-secondary);
+  --color-secondary-container: var(--md-sys-color-secondary-container);
+  --color-on-secondary-container: var(--md-sys-color-on-secondary-container);
+  --color-surface: var(--md-sys-color-surface);
+  --color-surface-variant: var(--md-sys-color-surface-variant);
+  --color-on-surface: var(--md-sys-color-on-surface);
+  --color-on-surface-variant: var(--md-sys-color-on-surface-variant);
+  --color-background: var(--md-sys-color-background);
+  --color-on-background: var(--md-sys-color-on-background);
+  --color-outline: var(--md-sys-color-outline);
+  --color-error: #ba1a1a;
+  --color-error-container: #ffdad6;
+  
+  --font-family-body: 'Outfit', 'Inter', system-ui, sans-serif;
+  --font-family-mono: 'JetBrains Mono', 'Fira Code', monospace;
+}
+
+:root {
+  /* Android 16 Monochrome Light - Neutral Tonal Palette */
+  --md-sys-color-primary: #000000;
+  --md-sys-color-on-primary: #ffffff;
+  --md-sys-color-primary-container: #f0f0f0;
+  --md-sys-color-on-primary-container: #000000;
+  
+  --md-sys-color-secondary: #5e5e62;
+  --md-sys-color-secondary-container: #e2e2e6;
+  --md-sys-color-on-secondary-container: #1a1c1e;
+
+  --md-sys-color-surface: #f9f9fc;
+  --md-sys-color-surface-variant: #e0e0e0;
+  --md-sys-color-on-surface: #1a1c1e;
+  --md-sys-color-on-surface-variant: #44474e;
+  --md-sys-color-background: #f9f9fc;
+  --md-sys-color-on-background: #1a1c1e;
+  --md-sys-color-outline: #74777f;
+
+  font-family: var(--font-family-body);
+  letter-spacing: -0.02em; /* Tighter Android 16 tracking */
+  -webkit-font-smoothing: antialiased;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    /* Android 16 Monochrome Dark - "Dark Spritz" */
+    --md-sys-color-primary: #ffffff;
+    --md-sys-color-on-primary: #000000;
+    --md-sys-color-primary-container: #2a2a2a;
+    --md-sys-color-on-primary-container: #ffffff;
+    
+    --md-sys-color-secondary: #c4c6cf;
+    --md-sys-color-secondary-container: #333333;
+    --md-sys-color-on-secondary-container: #e2e2e6;
+
+    --md-sys-color-surface: #0a0a0a;
+    --md-sys-color-surface-variant: #1a1a1a;
+    --md-sys-color-on-surface: #f0f0f0;
+    --md-sys-color-on-surface-variant: #aaaaaa;
+    --md-sys-color-background: #0a0a0a;
+    --md-sys-color-on-background: #f0f0f0;
+    --md-sys-color-outline: #444444;
+  }
+}
+
+:root {
+  background-color: transparent !important;
+}
+
+body {
+  background-color: transparent !important;
+  color: var(--md-sys-color-on-background);
+  font-family: 'Outfit', sans-serif;
+  margin: 0;
+  overflow-x: hidden;
+}
+
+#root {
+  min-height: 100vh;
+  background-color: var(--color-background);
+  transition: background-color 0.8s cubic-bezier(0.2, 0.8, 0.2, 1);
+  font-variant-numeric: tabular-nums;
+}
+
+.is-windows #root {
+  background-color: rgba(0, 0, 0, 0.6) !important;
+}
+
+/* Material 3 Expressive Shapes (Android 15+ style) */
+.my-card {
+  background-color: var(--color-surface-variant);
+  border-radius: 24px;
+  padding: 32px;
+  border: 1px solid rgba(255, 255, 255, 0.05); /* Precise Monochrome Rim */
+  box-shadow: 
+    0 10px 15px -3px rgba(0, 0, 0, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.02);
+  transition: all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1); /* Ink-like easing */
+}
+
+.my-card:hover {
+  border-color: rgba(255, 255, 255, 0.15);
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
+  transform: translateY(-2px);
+}
+
+.my-button {
+  background-color: var(--color-primary-container);
+  color: var(--color-on-primary-container);
+  border-radius: 16px;
+  padding: 14px 24px;
+  font-weight: 900; /* Android 16 heavier weights */
+  text-transform: uppercase;
+  letter-spacing: 0.15em;
+  font-size: 0.7rem;
+  transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  position: relative;
+  overflow: hidden;
+}
+
+.my-button:hover {
+  filter: brightness(1.2);
+  box-shadow: 0 12px 30px rgba(0,0,0,0.3);
+}
+
+.my-button-primary {
+  background-color: var(--color-primary);
+  color: var(--color-on-primary);
+  box-shadow: 0 8px 16px rgba(0,0,0,0.2);
+}
+
+/* Thick Expressive Sliders */
+.my-slider-track {
+  width: 100%;
+  height: 48px; /* Even thicker for Android 16 Expressive */
+  background: var(--color-surface);
+  border-radius: 12px;
+  appearance: none;
+  outline: none;
+  overflow: hidden;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  cursor: pointer;
+  transition: border-color 0.4s;
+}
+
+.my-slider-track::-webkit-slider-thumb {
+  appearance: none;
+  width: 4px;
+  height: 48px;
+  background: var(--color-primary);
+  border-radius: 0;
+  cursor: pointer;
+  box-shadow: -400px 0 0 400px var(--color-primary);
+  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+/* Ripple Animation - Monochrome White */
+@keyframes ripple {
+  0% { transform: scale(0.5); opacity: 0.8; }
+  100% { transform: scale(6); opacity: 0; }
+}
+
+.ripple-effect {
+  position: absolute;
+  border-radius: 50%;
+  background-color: white;
+  pointer-events: none;
+  animation: ripple 1.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background: var(--color-outline);
+  border-radius: 10px;
+}
+
+/* Red Exception for Errors */
+.status-error {
+  background-color: rgba(186, 26, 26, 0.1) !important;
+  border-color: #ba1a1a !important;
+  color: #ffdad6 !important;
+}
+
+/* Monochrome High-Contrast Render Button */
+.render-button {
+  background-color: #ffffff !important;
+  color: #000000 !important;
+  font-weight: 900 !important;
+  box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+}
+
+.render-button:hover {
+  box-shadow: 0 0 40px rgba(255, 255, 255, 0.3);
+  transform: scale(1.02) translateY(-2px);
+}
