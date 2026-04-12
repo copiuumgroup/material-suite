@@ -1,8 +1,8 @@
 # Material Audio Studio 🎧💎
 
-> **Professional High-Fidelity DSP Mastering Suite optimized for the latest Windows LTSC releases.**
+> **Professional High-Fidelity DSP Mastering Suite optimized for modern Windows LTSC releases.**
 
-Material Audio Studio is a premium, developer-centric audio tool designed for modern Windows environments. It provides high-performance Digital Signal Processing (DSP) for creating "Slowed + Reverb" and "Nightcore" versions of tracks with professional-grade EQ and stabilization.
+Material Audio Studio is a premium, local-first audio tool designed for modern Windows environments. It provides high-performance Digital Signal Processing (DSP) for creating "Slowed + Reverb" and "Nightcore" versions of tracks with professional-grade EQ, stabilization, and a robust ingestion engine.
 
 ---
 
@@ -25,14 +25,21 @@ This application is strictly optimized and targeted for **Industrial & Enterpris
 - **Self-Contained Sessions**: Every project is automatically internalized into a local "Vault" (`%APPDATA%/material-audio-tool/archives`).
 - **Persistence Guarantee**: Delete or move the original source files; your Studio Archives remain perfectly intact.
 
+### 📥 YT-DLP Ingestion Engine (New)
+- **Local-First Ingest**: Robust ingestion using a local `yt-dlp` engine. No external cloud dependencies or API keys required.
+- **Configurable Quality**: Select between **Lossless WAV** or **High-Quality MP3 (320kbps)** for your mastering source.
+- **Real-Time Diagnostics**: Integrated system monitor with live terminal logs, auto-scrolling, and interactive font scaling (Ctrl+Scroll).
+- **Process Guard**: Automated safety watchdogs, background process registries, and an interactive "Force Kill" fail-safe.
+
 ### ⏱️ Effective Mastering Chain
 - **Slowed + Reverb**: Professional IR-convolution reverb and high-precision speed stretching.
 - **Nightcore**: High-speed resampling with frequency preservation.
-- **Effective Timing**: Clocks and waveforms dynamically scale with speed adjustments for accurate project length estimation.
-
-### 🎨 Visual Excellence
-- **Windows Native Styling**: Built with Electron, React 19, and Tailwind CSS v4, utilizing native Mica material for a stunning, translucent look.
 - **Dynamic Waveforms**: Real-time buffer rendering with precision seeking.
+
+### 🎨 Visual & Audio Excellence
+- **Android 16 Aesthetics**: Inspired by the latest Material 3 and Android 16 design principles—clean, high-contrast, and monochrome-focused.
+- **Offline Ready**: All typography (Outfit/Inter), icons, and assets are served locally. Zero external network calls for assets.
+- **Synthesized Sound Engine**: Deep system integration with unique audio signatures for Success, Warning, and Fatal events.
 
 ---
 
@@ -40,6 +47,8 @@ This application is strictly optimized and targeted for **Industrial & Enterpris
 
 ### Prerequisites
 -   **Node.js v20+**
+-   **yt-dlp** (Must be in your system PATH)
+-   **ffmpeg** (Required for audio extraction)
 -   **Windows 10/11 LTSC** (Recommended)
 
 ### Installation
@@ -64,6 +73,7 @@ npm run package
 ## 🛠️ Technology Stack
 - **Core**: Electron, React 19, TypeScript
 - **Styling**: Tailwind CSS v4, Lucide Icons, Framer Motion
+- **Inference**: Native `yt-dlp` Process Management
 - **Audio**: Web Audio API (AudioContext & Offline Rendering)
 - **Database**: Dexie.js (IndexedDB)
 - **Native**: Microsoft Mica / Windows 11 WCO Integration
