@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
+import { analyzeAudio } from './services/analyzer';
 
 function createReverbIR(audioCtx: BaseAudioContext, duration: number, decay: number) {
   const sampleRate = audioCtx.sampleRate;
@@ -22,17 +23,25 @@ export interface EQSettings {
   air: number;    // 12000Hz
 }
 
+export type MasteringPreset = 'transparent' | 'slowed_reverb' | 'nightcore';
+
 export function useAudioEngine(
   activeBuffer: AudioBuffer | null, 
   speed: number, 
   reverbWet: number,
   eq: EQSettings,
   attenuation: number,
-  isLimiterEnabled: boolean
+  isLimiterEnabled: boolean,
+  punch: number,
+  tail: number,
+  isElastic: boolean,
+  onAnalysis?: (bpm: number, genre: string, suggestedEQ: any) => void
 ) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [audioCtx, setAudioCtx] = useState<AudioContext | null>(null);
+  const [bpm, setBpm] = useState(0);
+  const [genre, setGenre] = useState('');
 
   const audioCtxRef = useRef<AudioContext | null>(null);
   const sourceRef = useRef<AudioBufferSourceNode | null>(null);
@@ -53,6 +62,7 @@ export function useAudioEngine(
   const limiterRef = useRef<DynamicsCompressorNode | null>(null);
   const attenuatorRef = useRef<GainNode | null>(null);
   const analyserRef = useRef<AnalyserNode | null>(null);
+  const shaperRef = useRef<AudioWorkletNode | null>(null);
 
   const [pausedAt, setPausedAt] = useState(0);
   const startedAtRef = useRef(0);
@@ -92,7 +102,6 @@ export function useAudioEngine(
 
     // Limiter -> Attenuator -> Analyser
     const limiter = ctx.createDynamicsCompressor();
-    // Limiter settings
     limiter.threshold.value = -1.0;
     limiter.knee.value = 0;
     limiter.ratio.value = 20;
@@ -101,8 +110,18 @@ export function useAudioEngine(
 
     const attenuator = ctx.createGain();
     const analyser = ctx.createAnalyser();
-    analyser.fftSize = 512;
+    analyser.fftSize = 2048; 
     analyser.smoothingTimeConstant = 0.8;
+
+    // Load Worklets
+    ctx.audioWorklet.addModule('/worklets/transient-shaper.js').then(() => {
+      if (ctx.state === 'closed') return;
+      const shaper = new AudioWorkletNode(ctx, 'transient-shaper-processor');
+      shaperRef.current = shaper;
+      summerGain.disconnect();
+      summerGain.connect(shaper);
+      shaper.connect(limiter);
+    }).catch(err => console.error("Worklet Load Error", err));
 
     summerGain.connect(limiter);
     limiter.connect(attenuator);
@@ -140,15 +159,28 @@ export function useAudioEngine(
 
   useEffect(() => {
     if (!limiterRef.current || !audioCtxRef.current) return;
-    // If disabled, just pass full dynamic range by setting high threshold or ratio 1
     limiterRef.current.ratio.setTargetAtTime(isLimiterEnabled ? 20 : 1, audioCtxRef.current.currentTime, 0.1);
   }, [isLimiterEnabled]);
 
-  // Existing playback logic...
+  useEffect(() => {
+    if (!shaperRef.current || !audioCtxRef.current) return;
+    const t = audioCtxRef.current.currentTime;
+    shaperRef.current.parameters.get('attack')?.setTargetAtTime(punch, t, 0.1);
+    shaperRef.current.parameters.get('sustain')?.setTargetAtTime(tail, t, 0.1);
+  }, [punch, tail]);
+
   useEffect(() => {
     setIsPlaying(false);
     setPausedAt(0);
     setCurrentTime(0);
+
+    if (activeBuffer) {
+      analyzeAudio(activeBuffer).then(res => {
+        setBpm(res.bpm);
+        setGenre(res.genreHint);
+        if (onAnalysis) onAnalysis(res.bpm, res.genreHint, res.suggestedEQ);
+      });
+    }
   }, [activeBuffer]);
 
   useEffect(() => {
@@ -178,13 +210,10 @@ export function useAudioEngine(
       const source = audioCtxRef.current.createBufferSource();
       source.buffer = activeBuffer;
       source.playbackRate.value = speed;
-      
       source.connect(filtersRef.current!.sub);
-
       source.start(0, pausedAt);
       startedAtRef.current = audioCtxRef.current.currentTime - (pausedAt / speed);
       sourceRef.current = source;
-      
       source.onended = () => {
         if (sourceRef.current === source) {
           setIsPlaying(false);
@@ -214,10 +243,10 @@ export function useAudioEngine(
   }, [isPlaying, activeBuffer]);
 
   useEffect(() => {
-    if (sourceRef.current) {
-      sourceRef.current.playbackRate.setTargetAtTime(speed, audioCtxRef.current!.currentTime, 0.1);
+    if (sourceRef.current && audioCtxRef.current) {
+      sourceRef.current.playbackRate.setTargetAtTime(speed, audioCtxRef.current.currentTime, 0.1);
     }
-  }, [speed]);
+  }, [speed, isElastic]);
 
   useEffect(() => {
     if (dryGainRef.current && wetGainRef.current && audioCtxRef.current) {
@@ -232,7 +261,6 @@ export function useAudioEngine(
     if (!activeBuffer) return;
     const wasPlaying = isPlaying;
     if (wasPlaying) setIsPlaying(false);
-    // UI provides "scaled" time, convert back to buffer position
     const bufferPos = Math.max(0, Math.min(time * speed, activeBuffer.duration));
     setPausedAt(bufferPos);
     setCurrentTime(bufferPos);
@@ -245,8 +273,8 @@ export function useAudioEngine(
   ): Promise<AudioBuffer | null> => {
     const offlineCtx = new OfflineAudioContext(
       targetBuffer.numberOfChannels,
-      audioCtxRef.current!.sampleRate * (targetBuffer.duration / p.speed),
-      audioCtxRef.current!.sampleRate
+      targetBuffer.sampleRate * (targetBuffer.duration / p.speed),
+      targetBuffer.sampleRate
     );
 
     const sub = offlineCtx.createBiquadFilter(); sub.type = 'lowshelf'; sub.frequency.value = 60; sub.gain.value = p.eq.sub;
@@ -295,6 +323,8 @@ export function useAudioEngine(
     seekTo,
     renderBuffer,
     audioCtx,
-    analyser: analyserRef.current
+    analyser: analyserRef.current,
+    bpm,
+    genre
   };
 }

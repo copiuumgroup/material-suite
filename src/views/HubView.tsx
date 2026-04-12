@@ -5,20 +5,7 @@ import type { ProjectMetadata } from '../db/database';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Plus, Music, ArrowRight, UploadCloud, Activity, CloudDownload, Loader2, CheckCircle2, AlertTriangle, Play, Trash2 } from 'lucide-react';
 
-declare global {
-  interface Window {
-    electronAPI?: {
-      readFile: any;
-      cacheAudioFile: any;
-      getMusicPath: () => Promise<string>;
-      getMetadata: (path: string) => Promise<{ title?: string; artist?: string; album?: string; coverArt?: string } | null>;
-      saveFile: (fileName: string, buffer: ArrayBuffer) => Promise<string>;
-      cobaltApiCall: (url: string) => Promise<{ success: boolean; url?: string; mirror?: string; error?: string }>;
-      downloadWithMetadata: (url: string, metadata: any) => Promise<{ success: boolean; path?: string; error?: string }>;
-      ytdlpDownload: (url: string) => Promise<{ success: boolean; error?: string }>;
-    };
-  }
-}
+
 
 interface Props {
   onOpenProject: (project: ProjectMetadata) => void;

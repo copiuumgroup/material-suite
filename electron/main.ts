@@ -1,4 +1,4 @@
-import { app, BrowserWindow, protocol, net, ipcMain, session } from 'electron';
+import { app, BrowserWindow, protocol, net, ipcMain, session, dialog } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -68,7 +68,7 @@ app.whenReady().then(() => {
         ...details.responseHeaders,
         'Content-Security-Policy': [
           "default-src 'self' studio:; " +
-          "script-src 'self' 'unsafe-eval' 'unsafe-inline' studio:; " +
+          "script-src 'self' 'unsafe-eval' 'unsafe-inline' studio: blob:; " +
           "style-src 'self' 'unsafe-inline' studio: https://fonts.googleapis.com; " +
           "font-src 'self' studio: https://fonts.gstatic.com; " +
           "img-src 'self' studio: data: blob: *; " +
@@ -106,7 +106,7 @@ ipcMain.handle('get-metadata', async (_event, filePath) => {
     const picture = metadata.common.picture?.[0];
     let coverArtDataUrl = '';
     if (picture) {
-      coverArtDataUrl = `data:${picture.format};base64,${picture.data.toString('base64')}`;
+      coverArtDataUrl = `data:${picture.format};base64,${Buffer.from(picture.data).toString('base64')}`;
     }
     return { title: metadata.common.title, artist: metadata.common.artist, coverArt: coverArtDataUrl };
   } catch (e) { return null; }
@@ -205,7 +205,7 @@ ipcMain.handle('download-with-metadata', async (_event, url, metadata) => {
 
     fs.writeFileSync(filePath, buffer);
     return { success: true, path: filePath };
-  } catch (e) {
+  } catch (e: any) {
     console.error('Download Error:', e);
     return { success: false, error: e.message };
   }
@@ -219,7 +219,7 @@ ipcMain.handle('read-file', async (_event, filePath) => {
       return null;
     }
     return fs.readFileSync(filePath);
-  } catch (e) {
+  } catch (e: any) {
     console.error(`[IPC] Read Error: ${e.message}`);
     return null;
   }
@@ -260,11 +260,34 @@ ipcMain.handle('cache-audio-file', async (_event, sourcePath, fileName, buffer?)
   }
 });
 
-ipcMain.handle('save-file', async (_event, fileName, arrayBuffer) => {
-  const musicPath = app.getPath('music');
-  const filePath = path.join(musicPath, fileName);
-  fs.writeFileSync(filePath, Buffer.from(arrayBuffer));
-  return filePath;
+ipcMain.handle('save-file', async (event, fileName, arrayBuffer) => {
+  console.log(`[IPC] save-file requested for: ${fileName}`);
+  const sender = event.sender;
+  const win = BrowserWindow.fromWebContents(sender);
+
+  const { filePath, canceled } = await dialog.showSaveDialog(win as BrowserWindow, {
+    title: 'Export Mastered Audio',
+    defaultPath: path.join(app.getPath('music'), fileName),
+    filters: [
+      { name: 'Audio Files', extensions: fileName.toLowerCase().endsWith('.mp3') ? ['mp3'] : ['wav'] }
+    ],
+    buttonLabel: 'Export Master',
+    properties: ['createDirectory', 'showOverwriteConfirmation']
+  });
+
+  if (canceled || !filePath) {
+    console.log('[IPC] Save dialog canceled');
+    return null;
+  }
+
+  try {
+    fs.writeFileSync(filePath, Buffer.from(arrayBuffer));
+    console.log(`[IPC] Successfully saved master to: ${filePath}`);
+    return filePath;
+  } catch (e) {
+    console.error(`[IPC] Failed to save file at ${filePath}:`, e);
+    return null;
+  }
 });
 
 app.on('window-all-closed', () => { app.quit(); });

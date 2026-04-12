@@ -21,6 +21,8 @@ export interface ProjectMetadata {
     attenuation: number;
     limiter: boolean;
   };
+  detectedBpm?: number;
+  detectedGenre?: string;
 }
 
 export class StudioDatabase extends Dexie {
