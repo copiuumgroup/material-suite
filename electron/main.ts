@@ -3,19 +3,13 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import * as mm from 'music-metadata';
-import axios from 'axios';
-import NodeID3 from 'node-id3';
 import { spawn } from 'child_process';
 import os from 'os';
 
+const activeProcesses = new Map<string, any>();
+
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
-const COBALT_MIRRORS = [
-  'https://api.cobalt.tools',
-  'https://cobalt.meowing.de',
-  'https://api.vxtwitter.com', // Sometimes redirects to cobalt
-  'https://cobalt.instavideo.io'
-];
 
 protocol.registerSchemesAsPrivileged([
   { scheme: 'studio', privileges: { standard: true, secure: true, supportFetchAPI: true, bypassCSP: true, stream: true } }
@@ -69,8 +63,8 @@ app.whenReady().then(() => {
         'Content-Security-Policy': [
           "default-src 'self' studio:; " +
           "script-src 'self' 'unsafe-eval' 'unsafe-inline' studio: blob:; " +
-          "style-src 'self' 'unsafe-inline' studio: https://fonts.googleapis.com; " +
-          "font-src 'self' studio: https://fonts.gstatic.com; " +
+          "style-src 'self' 'unsafe-inline' studio:; " +
+          "font-src 'self' studio:; " +
           "img-src 'self' studio: data: blob: *; " +
           "media-src 'self' studio: blob: data: *; " +
           "connect-src 'self' studio: *;"
@@ -112,103 +106,76 @@ ipcMain.handle('get-metadata', async (_event, filePath) => {
   } catch (e) { return null; }
 });
 
-ipcMain.handle('cobalt-api-call', async (_event, trackUrl) => {
-  let lastError = '';
 
-  for (const instance of COBALT_MIRRORS) {
-    try {
-      console.log(`Trying Cobalt Mirror: ${instance}`);
-      const response = await axios.post(`${instance}/api/json`, {
-        url: trackUrl,
-        audioFormat: 'mp3',
-        audioBitrate: '320',
-        filenameStyle: 'basic'
-      }, {
-        timeout: 8000,
-        headers: {
-          'Accept': 'application/json',
-          'Content-Type': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-          'Origin': instance,
-          'Referer': instance + '/'
-        }
-      });
-
-      if (response.data?.url) return { success: true, url: response.data.url, mirror: instance };
-      lastError = 'No download URL returned from this mirror';
-    } catch (e: any) {
-      lastError = e.response?.data?.text || e.message;
-      if (lastError.includes('turnstile')) {
-        console.warn(`Mirror ${instance} blocked by Turnstile. Cycling...`);
-      } else {
-        console.warn(`Mirror ${instance} failed: ${lastError}`);
-      }
-      continue; // Try next mirror
-    }
-  }
-
-  return { success: false, error: `All Cobalt mirrors failed. Last error: ${lastError}` };
-});
-
-ipcMain.handle('ytdlp-download', async (_event, trackUrl) => {
+ipcMain.handle('ytdlp-download', async (event, trackUrl, options) => {
+  const quality = options?.quality || 'mp3';
   const musicPath = app.getPath('music');
+  const win = BrowserWindow.fromWebContents(event.sender);
+
   return new Promise((resolve) => {
-    const process = spawn('yt-dlp', [
-      '-x', '--audio-format', 'mp3',
-      '--audio-quality', '320K',
+    const args = [
+      '-x', '--audio-format', quality,
       '-o', path.join(musicPath, '%(uploader)s - %(title)s.%(ext)s'),
       '--embed-thumbnail',
       '--add-metadata',
       trackUrl
-    ]);
+    ];
 
-    let errorOutput = '';
-    process.stderr.on('data', (data) => { errorOutput += data.toString(); });
+    if (quality === 'mp3') {
+      args.splice(3, 0, '--audio-quality', '320K');
+    }
+
+    const process = spawn('yt-dlp', args);
+    let errorLog = '';
+
+    activeProcesses.set(trackUrl, process);
+
+    const watchdog = setTimeout(() => {
+      if (activeProcesses.has(trackUrl)) {
+        process.kill();
+        activeProcesses.delete(trackUrl);
+        win?.webContents.send('ytdlp-log', 'ERROR: Process timed out after 5 minutes.');
+      }
+    }, 5 * 60 * 1000);
+
+    process.stdout.on('data', (data) => {
+      win?.webContents.send('ytdlp-log', data.toString());
+    });
+
+    process.stderr.on('data', (data) => {
+      const msg = data.toString();
+      errorLog += msg;
+      win?.webContents.send('ytdlp-log', msg);
+    });
 
     process.on('close', (code) => {
+      clearTimeout(watchdog);
+      activeProcesses.delete(trackUrl);
+
+      if (code !== 0 && errorLog) {
+        try {
+          const logPath = path.join(musicPath, 'ytdlp_error_reports.log');
+          fs.appendFileSync(logPath, `\n[${new Date().toISOString()}] Failed: ${trackUrl}\n${errorLog}\n${'-'.repeat(40)}\n`);
+        } catch (e) { console.error('Failed to write error log:', e); }
+      }
+
       if (code === 0) resolve({ success: true });
-      else resolve({ success: false, error: errorOutput || 'yt-dlp failed' });
+      else resolve({ success: false, error: 'yt-dlp failed (see log)' });
     });
   });
 });
 
-ipcMain.handle('download-with-metadata', async (_event, url, metadata) => {
+ipcMain.handle('open-music-folder', async () => {
   const musicPath = app.getPath('music');
-  const safeTitle = (metadata.title || 'Unknown').replace(/[\\/:*?"<>|]/g, '');
-  const safeArtist = (metadata.artist || 'Unknown').replace(/[\\/:*?"<>|]/g, '');
-  const fileName = `${safeArtist} - ${safeTitle}.mp3`;
-  const filePath = path.join(musicPath, fileName);
+  shell.openPath(musicPath);
+  return true;
+});
 
-  try {
-    const response = await axios({ url, method: 'GET', responseType: 'arraybuffer' });
-    let buffer = Buffer.from(response.data);
-
-    // Tagging
-    const tags: any = {
-      title: metadata.title,
-      artist: metadata.artist,
-      album: metadata.album
-    };
-
-    if (metadata.coverArtUrl) {
-      const imgRes = await axios({ url: metadata.coverArtUrl, method: 'GET', responseType: 'arraybuffer' });
-      tags.image = {
-        mime: 'image/jpeg',
-        type: { id: 3, name: 'front cover' },
-        description: 'Cover Art',
-        imageBuffer: Buffer.from(imgRes.data)
-      };
-    }
-
-    const success = NodeID3.write(tags, buffer);
-    if (success) buffer = success;
-
-    fs.writeFileSync(filePath, buffer);
-    return { success: true, path: filePath };
-  } catch (e: any) {
-    console.error('Download Error:', e);
-    return { success: false, error: e.message };
-  }
+ipcMain.handle('ytdlp-cancel', () => {
+  console.log(`[IPC] Killing ${activeProcesses.size} active yt-dlp processes...`);
+  activeProcesses.forEach((proc) => proc.kill());
+  activeProcesses.clear();
+  return true;
 });
 
 ipcMain.handle('read-file', async (_event, filePath) => {
@@ -291,3 +258,8 @@ ipcMain.handle('save-file', async (event, fileName, arrayBuffer) => {
 });
 
 app.on('window-all-closed', () => { app.quit(); });
+
+app.on('will-quit', () => {
+  activeProcesses.forEach((proc) => proc.kill());
+  activeProcesses.clear();
+});

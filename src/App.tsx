@@ -18,11 +18,12 @@ declare global {
       getMusicPath: () => Promise<string>;
       getMetadata: (path: string) => Promise<{ title?: string; artist?: string; album?: string; coverArt?: string } | null>;
       saveFile: (fileName: string, buffer: ArrayBuffer) => Promise<string>;
-      cobaltApiCall: (url: string) => Promise<{ success: boolean; url?: string; mirror?: string; error?: string }>;
-      downloadWithMetadata: (url: string, metadata: any) => Promise<{ success: boolean; path?: string; error?: string }>;
-      ytdlpDownload: (url: string) => Promise<{ success: boolean; error?: string }>;
+      ytdlpDownload: (url: string, options?: { quality?: 'mp3' | 'wav' }) => Promise<{ success: boolean; error?: string }>;
+      ytdlpCancel: () => Promise<boolean>;
+      openMusicFolder: () => Promise<boolean>;
       readFile: (path: string) => Promise<ArrayBuffer | null>;
       cacheAudioFile: (sourcePath: string | null, fileName: string, buffer?: ArrayBuffer) => Promise<string | null>;
+      onYtdlpLog: (callback: (data: string) => void) => () => void;
     };
   }
 }
@@ -331,7 +332,7 @@ function App() {
   };
 
   return (
-    <div className={cn("w-full max-w-[1700px] mx-auto p-6 min-h-screen flex flex-col transition-all duration-1000 is-windows")}>
+    <div className={cn("w-full max-w-[1700px] mx-auto p-6 h-screen overflow-hidden flex flex-col transition-all duration-1000 is-windows")}>
       <div className="fixed top-0 left-0 w-full h-8 title-bar-drag z-[100] pointer-events-none" />
       <AnimatePresence mode="wait">
         {view === 'hub' ? (
