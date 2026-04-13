@@ -1,6 +1,7 @@
 import { FFmpeg } from '@ffmpeg/ffmpeg';
 import { toBlobURL } from '@ffmpeg/util';
 import { useRef, useState } from 'react';
+import { studioAPI } from './services/engine/MaterialStudioAPI';
 
 export function useExporter() {
   const [isExporting, setIsExporting] = useState(false);
@@ -11,6 +12,7 @@ export function useExporter() {
     const ffmpeg = ffmpegRef.current;
     if (ffmpeg.loaded) return;
 
+    studioAPI.emitStudioLog("Loading FFmpeg Production Core...");
     const baseURL = 'https://unpkg.com/@ffmpeg/core@0.12.6/dist/esm';
     ffmpeg.on('progress', ({ progress }) => {
       setProgress(Math.round(progress * 100));
@@ -34,16 +36,26 @@ export function useExporter() {
       await load();
       const ffmpeg = ffmpegRef.current;
 
-      const wavData = audioBufferToWav(audioBuffer);
+      studioAPI.emitStudioLog(`Exporting at ${kbps}kbps with 32-bit float precision...`);
+
+      // Convert to 32-bit float WAV (f32le)
+      const wavData = audioBufferToWav32(audioBuffer);
       await ffmpeg.writeFile('input.wav', new Uint8Array(wavData));
 
       const outName = `output.${format}`;
-      
       const realName = filename.replace(/\.(mp3|wav|ogg|flac)$/i, '');
       
       if (format === 'mp3') {
-        const br = parseInt(kbps) > 320 ? '320' : kbps; // Cap at 320 for mp3
-        await ffmpeg.exec(['-i', 'input.wav', '-b:a', `${br}k`, outName]);
+        const br = kbps === '320' ? '320' : kbps;
+        // Use high-quality CBR settings for MP3
+        await ffmpeg.exec([
+           '-i', 'input.wav', 
+           '-codec:a', 'libmp3lame', 
+           '-b:a', `${br}k`,
+           '-ar', '44100',
+           '-ac', '2',
+           outName
+        ]);
       } else {
         await ffmpeg.exec(['-i', 'input.wav', outName]);
       }
@@ -51,19 +63,10 @@ export function useExporter() {
       const data = await ffmpeg.readFile(outName) as Uint8Array;
       const blob = new Blob([data as any], { type: `audio/${format}` });
       
-      // Browser download (Only if not in Electron)
-      if (!window.electronAPI) {
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = `material-${format === 'mp3' ? kbps + 'k-' : ''}${realName}.${format}`;
-        a.click();
-        URL.revokeObjectURL(url);
-      }
-
+      studioAPI.emitStudioLog(`Mastering Complete: ${realName}.${format}`);
       return blob;
     } catch (e) {
-      console.error("Export Error", e);
+      studioAPI.emitStudioLog(`EXPORT ERROR: ${e}`);
       return null;
     } finally {
       setIsExporting(false);
@@ -74,23 +77,19 @@ export function useExporter() {
   return { exportAudio, isExporting, progress };
 }
 
-function audioBufferToWav(buffer: AudioBuffer) {
+/**
+ * Generates a 32-bit Float LE (f32le) WAV file from an AudioBuffer.
+ * This ensures "Lossless" internal quality before final encoding.
+ */
+function audioBufferToWav32(buffer: AudioBuffer) {
   const numChannels = buffer.numberOfChannels;
   const sampleRate = buffer.sampleRate;
-  const format = 1; // PCM
-  const bitDepth = 16;
-  const bytesPerSample = bitDepth / 8;
+  const format = 3; // IEEE Float
+  const bitDepth = 32;
+  const bytesPerSample = 4;
   const blockAlign = numChannels * bytesPerSample;
   
-  const bufferData = new Float32Array(buffer.length * numChannels);
-  for (let i = 0; i < buffer.numberOfChannels; i++) {
-    const channelData = buffer.getChannelData(i);
-    for (let j = 0; j < buffer.length; j++) {
-      bufferData[j * numChannels + i] = channelData[j];
-    }
-  }
-  
-  const dataByteLength = bufferData.length * bytesPerSample;
+  const dataByteLength = buffer.length * numChannels * bytesPerSample;
   const bufferLength = 44 + dataByteLength;
   const arrayBuffer = new ArrayBuffer(bufferLength);
   const view = new DataView(arrayBuffer);
@@ -116,9 +115,12 @@ function audioBufferToWav(buffer: AudioBuffer) {
   view.setUint32(40, dataByteLength, true);
   
   let offset = 44;
-  for (let i = 0; i < bufferData.length; i++, offset += 2) {
-    let s = Math.max(-1, Math.min(1, bufferData[i]));
-    view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+  for (let i = 0; i < buffer.length; i++) {
+    for (let channel = 0; channel < numChannels; channel++) {
+      const s = buffer.getChannelData(channel)[i];
+      view.setFloat32(offset, s, true);
+      offset += 4;
+    }
   }
   
   return arrayBuffer;

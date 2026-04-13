@@ -23,7 +23,13 @@ export default defineConfig({
                 'path',
                 'url',
                 'child_process'
-              ]
+              ],
+              onwarn(warning, warn) {
+                // Suppress specific noise that we can't control from internal plugins
+                if (warning.code === 'INVALID_OPTION' && warning.message.includes('"freeze"')) return;
+                if (warning.message.includes('customResolver')) return;
+                warn(warning);
+              }
             }
           }
         }

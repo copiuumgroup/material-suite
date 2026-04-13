@@ -8,8 +8,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   selectDownloadDirectory: () => ipcRenderer.invoke('select-download-directory'),
   ytdlpDownload: (url: string, options?: { quality?: 'mp3' | 'wav'; mode?: 'audio' | 'video'; destinationPath?: string }) => 
     ipcRenderer.invoke('ytdlp-download', url, options),
+  ytdlpGetInfo: (url: string) => ipcRenderer.invoke('ytdlp-get-info', url),
   ytdlpCancel: () => ipcRenderer.invoke('ytdlp-cancel'),
   openMusicFolder: () => ipcRenderer.invoke('open-music-folder'),
+  openAppDataFolder: () => ipcRenderer.invoke('open-appdata-folder'),
   checkSystemBinary: () => ipcRenderer.invoke('check-system-binary'),
   purgeArchives: () => ipcRenderer.invoke('purge-archives'),
   getEngineMetrics: () => ipcRenderer.invoke('get-engine-metrics'),

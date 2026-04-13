@@ -1,4 +1,4 @@
-import { app, BrowserWindow, protocol, net, ipcMain, session, dialog, shell } from 'electron';
+import { app, BrowserWindow, protocol, net, ipcMain, session, dialog, shell, type IpcMainInvokeEvent } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -23,7 +23,7 @@ function cleanupPartialFiles() {
   try {
     if (!fs.existsSync(musicPath)) return;
     const files = fs.readdirSync(musicPath);
-    files.forEach(file => {
+    files.forEach((file: string) => {
       if (file.endsWith('.part') || file.endsWith('.ytdl')) {
         try { fs.unlinkSync(path.join(musicPath, file)); } catch (e) {}
       }
@@ -82,24 +82,24 @@ function createWindow() {
 }
 
 app.whenReady().then(() => {
-  session.defaultSession.webRequest.onHeadersReceived((details, callback) => {
+  session.defaultSession.webRequest.onHeadersReceived((details: any, callback: any) => {
     callback({
       responseHeaders: {
         ...details.responseHeaders,
         'Content-Security-Policy': [
           "default-src 'self' studio:; " +
-          "script-src 'self' " + (process.env.VITE_DEV_SERVER_URL ? "'unsafe-eval' " : "") + "'unsafe-inline' studio: blob:; " +
+          "script-src 'self' " + (process.env.VITE_DEV_SERVER_URL ? "'unsafe-eval' https://unpkg.com " : "https://unpkg.com ") + "'unsafe-inline' studio: blob:; " +
           "style-src 'self' 'unsafe-inline' studio:; " +
           "font-src 'self' studio:; " +
           "img-src 'self' studio: data: blob:; " +
           "media-src 'self' studio: media: blob: data:; " +
-          "connect-src 'self' studio:;"
+          "connect-src 'self' studio: https://unpkg.com;"
         ]
       }
     });
   });
 
-  protocol.handle('studio', async (request) => {
+  protocol.handle('studio', async (request: Request) => {
     const url = request.url.replace('studio://app/', '');
     const filePath = path.join(__dirname, '../dist', url);
     try {
@@ -114,7 +114,7 @@ app.whenReady().then(() => {
     }
   });
 
-  protocol.handle('media', async (request) => {
+  protocol.handle('media', async (request: Request) => {
     const rawPath = request.url.replace('media://', '');
     const decodedPath = decodeURIComponent(rawPath);
     const filePath = fileURLToPath('file:///' + decodedPath);
@@ -137,11 +137,10 @@ app.whenReady().then(() => {
 // NATIVE HANDLERS
 ipcMain.handle('get-music-path', () => app.getPath('music'));
 
-ipcMain.handle('extract-audio', async (_event, filePath) => {
+ipcMain.handle('extract-audio', async (_event: IpcMainInvokeEvent, filePath: string) => {
   if (!isPathSafe(filePath)) return null;
 
   return new Promise((resolve) => {
-    // Positional -- prevents additional arguments from being injected
     const args = [
       '-i', filePath,
       '-f', 'wav',
@@ -157,7 +156,7 @@ ipcMain.handle('extract-audio', async (_event, filePath) => {
     let chunks: Buffer[] = [];
     let totalSize = 0;
     
-    ff.stdout.on('data', (data) => {
+    ff.stdout.on('data', (data: Buffer) => {
       totalSize += data.length;
       if (totalSize > MAX_BUFFER_SIZE) {
         console.error('[SECURITY] Memory Limit Exceeded (512MB). Killing extraction.');
@@ -168,7 +167,7 @@ ipcMain.handle('extract-audio', async (_event, filePath) => {
       chunks.push(data);
     });
 
-    ff.on('close', (code) => {
+    ff.on('close', (code: number) => {
       activeProcesses.delete(jobId);
       if (code === 0 && totalSize <= MAX_BUFFER_SIZE) {
         const fullBuffer = Buffer.concat(chunks);
@@ -185,7 +184,7 @@ ipcMain.handle('extract-audio', async (_event, filePath) => {
   });
 });
 
-ipcMain.handle('get-metadata', async (_event, filePath) => {
+ipcMain.handle('get-metadata', async (_event: IpcMainInvokeEvent, filePath: string) => {
   if (!isPathSafe(filePath)) return null;
   try {
     const metadata = await mm.parseFile(filePath);
@@ -199,7 +198,35 @@ ipcMain.handle('get-metadata', async (_event, filePath) => {
 });
 
 
-ipcMain.handle('ytdlp-download', async (event, trackUrl, options) => {
+ipcMain.handle('ytdlp-get-info', async (_event: IpcMainInvokeEvent, trackUrl: string) => {
+  return new Promise((resolve) => {
+    const args = ['--dump-json', '--flat-playlist', '--no-warnings', '--', trackUrl];
+    const process = spawn('yt-dlp', args);
+    let output = '';
+    
+    process.stdout.on('data', (data: Buffer) => { output += data.toString(); });
+    process.on('close', (code: number) => {
+      if (code === 0) {
+        try {
+          const info = JSON.parse(output);
+          resolve({
+            success: true,
+            info: {
+              title: info.title,
+              uploader: info.uploader || info.channel,
+              duration: info.duration,
+              thumbnail: info.thumbnail || (info.thumbnails && info.thumbnails[0]?.url),
+              webpage_url: info.webpage_url
+            }
+          });
+        } catch (e) { resolve({ success: false, error: 'Failed to parse metadata' }); }
+      } else { resolve({ success: false, error: 'yt-dlp failed to fetch metadata' }); }
+    });
+    process.on('error', (err: any) => resolve({ success: false, error: err.message }));
+  });
+});
+
+ipcMain.handle('ytdlp-download', async (event: IpcMainInvokeEvent, trackUrl: string, options: any) => {
   const mode = options?.mode || 'audio';
   const quality = options?.quality || 'mp3';
   const musicPath = options?.destinationPath || app.getPath('music');
@@ -218,10 +245,9 @@ ipcMain.handle('ytdlp-download', async (event, trackUrl, options) => {
         trackUrl
       ];
       if (quality === 'mp3') {
-        args.splice(3, 0, '--audio-quality', '320K');
+        args.splice(3, 0, '--audio-quality', '320K'); // Force 320kbps CBR
       }
     } else {
-      // VIDEO MODE: Download best MP4 compatible with Chromium
       args = [
         '-f', 'bestvideo[ext=mp4]+bestaudio[ext=m4a]/best[ext=mp4]/best',
         '-o', path.join(musicPath, '%(uploader)s - %(title)s.mp4'),
@@ -233,14 +259,14 @@ ipcMain.handle('ytdlp-download', async (event, trackUrl, options) => {
     }
     
     const process = spawn('yt-dlp', args);
-    const jobId = `ytdlp-${trackUrl}-${Date.now()}`; // Unique enough per session
+    const jobId = `ytdlp-${trackUrl}-${Date.now()}`; 
     activeProcesses.set(jobId, process);
     
     let errorLog = '';
 
-    process.on('error', (err) => {
+    process.on('error', (err: any) => {
       activeProcesses.delete(jobId);
-      const errMsg = `FATAL: Failed to launch yt-dlp. Is it installed and in PATH? (${err.message})`;
+      const errMsg = `FATAL: Failed to launch yt-dlp. (${err.message})`;
       win?.webContents.send('ytdlp-log', errMsg);
       resolve({ success: false, error: 'YT-DLP launch failed' });
     });
@@ -253,17 +279,17 @@ ipcMain.handle('ytdlp-download', async (event, trackUrl, options) => {
       }
     }, 5 * 60 * 1000);
 
-    process.stdout.on('data', (data) => {
+    process.stdout.on('data', (data: Buffer) => {
       win?.webContents.send('ytdlp-log', data.toString());
     });
 
-    process.stderr.on('data', (data) => {
+    process.stderr.on('data', (data: Buffer) => {
       const msg = data.toString();
       errorLog += msg;
       win?.webContents.send('ytdlp-log', msg);
     });
 
-    process.on('close', (code) => {
+    process.on('close', (code: number) => {
       clearTimeout(watchdog);
       activeProcesses.delete(jobId);
 
@@ -272,8 +298,7 @@ ipcMain.handle('ytdlp-download', async (event, trackUrl, options) => {
           const logDir = app.getPath('userData');
           const logPath = path.join(logDir, 'ytdlp_error_reports.log');
           fs.appendFileSync(logPath, `\n[${new Date().toISOString()}] Failed: ${trackUrl}\n${errorLog}\n${'-'.repeat(40)}\n`);
-          console.log(`[SYSTEM] Error report persisted to: ${logPath}`);
-        } catch (e) { console.error('[SYSTEM] Failed to write error log:', e); }
+        } catch (e) {}
       }
 
       if (code === 0) resolve({ success: true });
@@ -288,7 +313,7 @@ ipcMain.handle('open-music-folder', async () => {
   return true;
 });
 
-ipcMain.handle('select-download-directory', async (event) => {
+ipcMain.handle('select-download-directory', async (event: IpcMainInvokeEvent) => {
   const win = BrowserWindow.fromWebContents(event.sender);
   const { canceled, filePaths } = await dialog.showOpenDialog(win!, {
     properties: ['openDirectory', 'createDirectory'],
@@ -304,7 +329,7 @@ ipcMain.handle('check-system-binary', async () => {
     try {
       const proc = spawn(cmd, [arg]);
       proc.on('error', () => resolve(false));
-      proc.on('close', (code) => resolve(code === 0));
+      proc.on('close', (code: number | null) => resolve(code === 0));
     } catch (e) { resolve(false); }
   });
 
@@ -343,27 +368,27 @@ ipcMain.handle('ytdlp-cancel', () => {
   return true;
 });
 
-ipcMain.handle('read-file', async (_event, filePath) => {
+ipcMain.handle('open-appdata-folder', async () => {
+  const userDataPath = app.getPath('userData');
+  shell.openPath(userDataPath);
+  return true;
+});
+
+ipcMain.handle('read-file', async (_event: IpcMainInvokeEvent, filePath: string) => {
   if (!isPathSafe(filePath)) return null;
   try {
-    console.log(`[IPC] Reading Vaulted File: ${filePath}`);
-    if (!fs.existsSync(filePath)) {
-      console.error(`[IPC] File Not Found: ${filePath}`);
-      return null;
-    }
+    if (!fs.existsSync(filePath)) return null;
     return fs.readFileSync(filePath);
   } catch (e: any) {
-    console.error(`[IPC] Read Error: ${e.message}`);
     return null;
   }
 });
 
-ipcMain.handle('cache-audio-file', async (_event, sourcePath, fileName, buffer?) => {
+ipcMain.handle('cache-audio-file', async (_event: IpcMainInvokeEvent, sourcePath: string | null, fileName: string, buffer?: any) => {
   try {
     const archivesPath = path.join(app.getPath('userData'), 'archives');
     if (!fs.existsSync(archivesPath)) fs.mkdirSync(archivesPath, { recursive: true });
     
-    // Check source size for unique naming if from disk
     let fileSize = 0;
     if (sourcePath && fs.existsSync(sourcePath)) {
       fileSize = fs.statSync(sourcePath).size;
@@ -375,7 +400,6 @@ ipcMain.handle('cache-audio-file', async (_event, sourcePath, fileName, buffer?)
     const vaultName = `${fileSize}-${safeName}`;
     const targetPath = path.join(archivesPath, vaultName);
 
-    // Idempotency check: if file already vaulted, don't copy again
     if (fs.existsSync(targetPath)) return targetPath;
 
     if (buffer) {
@@ -388,15 +412,12 @@ ipcMain.handle('cache-audio-file', async (_event, sourcePath, fileName, buffer?)
     
     return targetPath;
   } catch (e) {
-    console.error('Cache Audio Error:', e);
     return null;
   }
 });
 
-ipcMain.handle('save-file', async (event, fileName, arrayBuffer) => {
-  console.log(`[IPC] save-file requested for: ${fileName}`);
-  const sender = event.sender;
-  const win = BrowserWindow.fromWebContents(sender);
+ipcMain.handle('save-file', async (event: IpcMainInvokeEvent, fileName: string, arrayBuffer: any) => {
+  const win = BrowserWindow.fromWebContents(event.sender);
 
   const { filePath, canceled } = await dialog.showSaveDialog(win as BrowserWindow, {
     title: 'Export Mastered Audio',
@@ -408,17 +429,12 @@ ipcMain.handle('save-file', async (event, fileName, arrayBuffer) => {
     properties: ['createDirectory', 'showOverwriteConfirmation']
   });
 
-  if (canceled || !filePath) {
-    console.log('[IPC] Save dialog canceled');
-    return null;
-  }
+  if (canceled || !filePath) return null;
 
   try {
     fs.writeFileSync(filePath, Buffer.from(arrayBuffer));
-    console.log(`[IPC] Successfully saved master to: ${filePath}`);
     return filePath;
   } catch (e) {
-    console.error(`[IPC] Failed to save file at ${filePath}:`, e);
     return null;
   }
 });

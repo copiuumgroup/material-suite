@@ -1,292 +1,99 @@
-@font-face {
-  font-family: 'Outfit';
-  src: url('./assets/fonts/outfit-v11-latin-regular.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Outfit';
-  src: url('./assets/fonts/outfit-v11-latin-900.woff2') format('woff2');
-  font-weight: 900;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Inter';
-  src: url('./assets/fonts/inter-v18-latin-regular.woff2') format('woff2');
-  font-weight: 400;
-  font-style: normal;
-  font-display: swap;
-}
-
-@font-face {
-  font-family: 'Inter';
-  src: url('./assets/fonts/inter-v18-latin-700.woff2') format('woff2');
-  font-weight: 700;
-  font-style: normal;
-  font-display: swap;
-}
-
 @import "tailwindcss";
-
+/** @tailwind base; @tailwind components; @tailwind utilities; @tailwind theme; */
 
 @theme {
-  --color-primary: var(--md-sys-color-primary);
-  --color-on-primary: var(--md-sys-color-on-primary);
-  --color-primary-container: var(--md-sys-color-primary-container);
-  --color-on-primary-container: var(--md-sys-color-on-primary-container);
-  --color-secondary: var(--md-sys-color-secondary);
-  --color-secondary-container: var(--md-sys-color-secondary-container);
-  --color-on-secondary-container: var(--md-sys-color-on-secondary-container);
-  --color-surface: var(--md-sys-color-surface);
-  --color-surface-variant: var(--md-sys-color-surface-variant);
-  --color-on-surface: var(--md-sys-color-on-surface);
-  --color-on-surface-variant: var(--md-sys-color-on-surface-variant);
-  --color-background: var(--md-sys-color-background);
-  --color-on-background: var(--md-sys-color-on-background);
-  --color-outline: var(--md-sys-color-outline);
-  --color-error: #ba1a1a;
-  --color-error-container: #ffdad6;
-  
-  --font-family-body: 'Segoe UI Variable Text', 'Segoe UI', 'Outfit', 'Inter', system-ui, sans-serif;
-  --font-family-mono: 'Cascadia Code', 'JetBrains Mono', 'Fira Code', monospace;
-}
-
-:root {
-  --theme-transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
-  background-color: transparent !important;
-}
-
-.light {
-  /* Android 16 Monochrome Light - Neutral Tonal Palette */
-  --md-sys-color-primary: #000000;
-  --md-sys-color-on-primary: #ffffff;
-  --md-sys-color-primary-container: #f0f0f0;
-  --md-sys-color-on-primary-container: #000000;
-  
-  --md-sys-color-secondary: #5e5e62;
-  --md-sys-color-secondary-container: #e2e2e6;
-  --md-sys-color-on-secondary-container: #1a1c1e;
-
-  --md-sys-color-surface: #f9f9fc;
-  --md-sys-color-surface-variant: #e0e0e0;
-  --md-sys-color-on-surface: #1a1c1e;
-  --md-sys-color-on-surface-variant: #44474e;
-  --md-sys-color-background: #f9f9fc;
-  --md-sys-color-on-background: #1a1c1e;
-  --md-sys-color-outline: #74777f;
-}
-
-:root {
   --color-primary: #ffffff;
   --color-on-primary: #000000;
-  --color-primary-container: rgba(255, 255, 255, 0.08);
-  --color-on-primary-container: #ffffff;
-  --color-secondary: rgba(255, 255, 255, 0.6);
-  --color-background: #000000;
-  --color-surface: rgba(10, 10, 10, 0.4);
+  
+  --color-surface: #000000;
   --color-on-surface: #ffffff;
-  --color-surface-variant: rgba(20, 20, 20, 0.6);
+  
+  --color-surface-variant: #000000;
   --color-on-surface-variant: rgba(255, 255, 255, 0.7);
-  --color-outline: rgba(255, 255, 255, 0.12);
+  
+  --color-outline: rgba(255, 255, 255, 0.1);
+  
+  --radius-4xl: 32px;
+  --radius-5xl: 48px;
 }
 
-.dark {
-  /* Android 16 Monochrome Dark - "Dark Spritz" */
-  --md-sys-color-primary: #ffffff;
-  --md-sys-color-on-primary: #000000;
-  --md-sys-color-primary-container: #2a2a2a;
-  --md-sys-color-on-primary-container: #ffffff;
-  --md-sys-color-secondary: #c4c6cf;
-  --md-sys-color-secondary-container: #333333;
-  --md-sys-color-on-secondary-container: #e2e2e6;
-  --md-sys-color-surface: #0a0a0a;
-  --md-sys-color-surface-variant: #1a1a1a;
-  --md-sys-color-on-surface: #f0f0f0;
-  --md-sys-color-on-surface-variant: #aaaaaa;
-  --md-sys-color-background: #0a0a0a;
-  --md-sys-color-on-background: #f0f0f0;
-  --md-sys-color-outline: #444444;
+/* Light Theme Overrides */
+.light {
+  --color-primary: #000000;
+  --color-on-primary: #ffffff;
+  
+  --color-surface: #ffffff;
+  --color-on-surface: #000000;
+  
+  --color-surface-variant: #f5f5f5;
+  --color-on-surface-variant: rgba(0, 0, 0, 0.6);
+  
+  --color-outline: rgba(0, 0, 0, 0.05);
 }
 
-.is-windows {
-  background: transparent !important;
+@layer base {
+  * {
+    @apply border-[var(--color-outline)] selection:bg-[var(--color-primary)] selection:text-[var(--color-on-primary)];
+  }
+
+  body {
+    @apply bg-[var(--color-surface)] text-[var(--color-on-surface)] antialiased overflow-hidden;
+    font-family: 'Outfit', 'Segoe UI', system-ui, sans-serif;
+  }
 }
 
-/* HIGH-DENSITY MICA EFFECT - ENHANCED VIBRANCY */
-.my-card {
-  background: rgba(10, 10, 10, 0.45) !important;
-  backdrop-filter: blur(60px) saturate(280%) !important;
-  border: 1px solid rgba(255, 255, 255, 0.12) !important;
-  border-radius: 44px;
-  padding: 2.5rem;
-  box-shadow: 0 40px 100px -20px rgba(0, 0, 0, 0.8), 
-              inset 0 1px 1px rgba(255, 255, 255, 0.08);
+@layer components {
+  .m3-card {
+    @apply bg-[var(--color-surface-variant)] rounded-4xl border border-[var(--color-outline)] transition-all duration-300;
+  }
+
+  .m3-button {
+    @apply px-6 py-3 rounded-full font-black uppercase tracking-widest text-[10px] transition-all duration-300 active:scale-95 disabled:opacity-20 flex items-center justify-center gap-2;
+  }
+
+  .m3-button-primary {
+    @apply bg-[var(--color-primary)] text-[var(--color-on-primary)] hover:opacity-90;
+  }
+
+  .m3-button-outline {
+    @apply border border-[var(--color-outline)] hover:bg-[var(--color-on-surface)] hover:text-[var(--color-surface)];
+  }
+
+  .m3-input {
+    @apply bg-[var(--color-surface-variant)] border border-[var(--color-outline)] rounded-2xl px-6 py-4 text-sm focus:outline-none focus:border-[var(--color-primary)]/40 transition-all placeholder:opacity-30;
+  }
 }
 
-.studio-panel {
-  background: rgba(20, 20, 20, 0.3);
-  backdrop-filter: blur(50px) saturate(200%);
-  border-radius: 32px;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  padding: 2rem;
-  transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
-}
-
-.studio-panel:hover {
-  background: rgba(20, 20, 20, 0.5);
-  border-color: rgba(255, 255, 255, 0.1);
-}
-
-/* RED GLOW FOR WARNINGS */
-.red-glow-text {
-  color: #ef4444;
-  text-shadow: 0 0 20px rgba(239, 68, 68, 0.4);
-}
-
-body {
-  background-color: transparent !important;
-  color: var(--md-sys-color-on-background);
-  font-family: 'Outfit', sans-serif;
-  margin: 0;
-  overflow-x: hidden;
-  transition: var(--theme-transition);
-}
-
-#root {
-  min-height: 100vh;
-  background-color: var(--color-background);
-  transition: var(--theme-transition);
-  font-variant-numeric: tabular-nums;
-  position: relative;
-  z-index: 1;
-}
-
-body.is-windows #root {
-  background-color: rgba(0, 0, 0, 0.45) !important; /* Material 3 translucent surface */
-  backdrop-filter: blur(20px);
-}
-
-.title-bar-drag {
-  -webkit-app-region: drag;
-}
-
-.title-bar-no-drag {
-  -webkit-app-region: no-drag;
-}
-
-/* Material 3 Expressive Shapes (Android 15+ style) */
-.my-card {
-  background-color: var(--color-surface-variant);
-  border-radius: 24px;
-  padding: 32px;
-  border: 1px solid rgba(255, 255, 255, 0.05); /* Precise Monochrome Rim */
-  box-shadow: 
-    0 10px 15px -3px rgba(0, 0, 0, 0.2),
-    inset 0 1px 0 rgba(255, 255, 255, 0.02);
-  transition: all 0.6s cubic-bezier(0.2, 0.8, 0.2, 1); /* Ink-like easing */
-}
-
-.my-card:hover {
-  border-color: rgba(255, 255, 255, 0.15);
-  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.4);
-  transform: translateY(-2px);
-}
-
-.my-button {
-  background-color: var(--color-primary-container);
-  color: var(--color-on-primary-container);
-  border-radius: 16px;
-  padding: 14px 24px;
-  font-weight: 900; /* Android 16 heavier weights */
-  text-transform: uppercase;
-  letter-spacing: 0.15em;
-  font-size: 0.7rem;
-  transition: all 0.5s cubic-bezier(0.2, 0.8, 0.2, 1);
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 10px;
-  position: relative;
-  overflow: hidden;
-}
-
-.my-button:hover {
-  filter: brightness(1.2);
-  box-shadow: 0 12px 30px rgba(0,0,0,0.3);
-}
-
-.my-button-primary {
-  background-color: var(--color-primary);
-  color: var(--color-on-primary);
-  box-shadow: 0 8px 16px rgba(0,0,0,0.2);
-}
-
-/* Thick Expressive Sliders */
-.my-slider-track {
-  width: 100%;
-  height: 48px; /* Even thicker for Android 16 Expressive */
-  background: var(--color-surface);
-  border-radius: 12px;
-  appearance: none;
-  outline: none;
-  overflow: hidden;
-  border: 1px solid rgba(255, 255, 255, 0.05);
-  cursor: pointer;
-  transition: border-color 0.4s;
-}
-
-.my-slider-track::-webkit-slider-thumb {
-  appearance: none;
+/* Scrollbar Refinement */
+::-webkit-scrollbar {
   width: 4px;
-  height: 48px;
-  background: var(--color-primary);
-  border-radius: 0;
-  cursor: pointer;
-  box-shadow: -400px 0 0 400px var(--color-primary);
-  transition: transform 0.3s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
-
-/* Ripple Animation - Monochrome White */
-@keyframes ripple {
-  0% { transform: scale(0.5); opacity: 0.8; }
-  100% { transform: scale(6); opacity: 0; }
+::-webkit-scrollbar-track {
+  background: transparent;
 }
-
-.ripple-effect {
-  position: absolute;
-  border-radius: 50%;
-  background-color: white;
-  pointer-events: none;
-  animation: ripple 1.8s cubic-bezier(0.2, 0.8, 0.2, 1) forwards;
-}
-
-.custom-scrollbar::-webkit-scrollbar-thumb {
+::-webkit-scrollbar-thumb {
   background: var(--color-outline);
   border-radius: 10px;
 }
-
-/* Red Exception for Errors */
-.status-error {
-  background-color: rgba(186, 26, 26, 0.1) !important;
-  border-color: #ba1a1a !important;
-  color: #ffdad6 !important;
+::-webkit-scrollbar-thumb:hover {
+  background: var(--color-primary);
 }
 
-/* Monochrome High-Contrast Render Button */
-.render-button {
-  background-color: #ffffff !important;
-  color: #000000 !important;
-  font-weight: 900 !important;
-  box-shadow: 0 0 20px rgba(255, 255, 255, 0.1);
+/* Animations */
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
 }
 
-.render-button:hover {
-  box-shadow: 0 0 40px rgba(255, 255, 255, 0.3);
-  transform: scale(1.02) translateY(-2px);
+.animate-float {
+  animation: float 6s ease-in-out infinite;
+}
+
+/* Android 16 Specific Glass */
+.m3-glass {
+  @apply backdrop-blur-3xl bg-[var(--color-surface)]/60;
+}
+
+.m3-chip {
+  @apply px-4 py-1.5 rounded-full bg-[var(--color-outline)] text-[10px] font-bold uppercase tracking-wider;
 }

@@ -51,7 +51,7 @@
   },
   "build": {
     "appId": "com.copiuum.materialstudio",
-    "productName": "Material Studio",
+    "productName": "Material Suite",
     "directories": {
       "output": "release"
     },
@@ -64,8 +64,7 @@
       "icon": "build/icon.png",
       "target": [
         "nsis",
-        "portable",
-        "msi"
+        "portable"
       ]
     },
     "nsis": {
@@ -73,7 +72,7 @@
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Material Studio"
+      "shortcutName": "Material Suite"
     },
     "msi": {
       "oneClick": false,
