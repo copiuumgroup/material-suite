@@ -17,6 +17,8 @@ interface Props {
   effects: StudioEffectParams;
   setEffects: (effects: StudioEffectParams) => void;
   onClose?: () => void;
+  onExport?: () => void;
+  uiMode: 'material' | 'metro';
 }
 
 const FloatingPlayer: React.FC<Props> = ({ 
@@ -29,8 +31,11 @@ const FloatingPlayer: React.FC<Props> = ({
   analyser,
   effects,
   setEffects,
-  onClose
+  onClose,
+  onExport,
+  uiMode
 }) => {
+  const isMetro = uiMode === 'metro';
   
   const toggleSlowed = () => {
     if (effects.speed === 0.8 && effects.reverbWet === 0.4) {
@@ -115,7 +120,7 @@ const FloatingPlayer: React.FC<Props> = ({
                   className={cn("p-3 rounded-2xl transition-all border", effects.isVocalReduced ? "bg-red-600 text-white border-[var(--color-outline)]" : "bg-[var(--color-primary)]/5 opacity-40 hover:opacity-100 border-[var(--color-outline)]")}
                   title="Vocal Isolation (AI SLot)"
                >
-                  <MicOff className="w-4 h-4" />
+                  <MicOff className={cn("w-4 h-4", isMetro ? "fill-current" : "")} />
                </button>
             </div>
 
@@ -140,10 +145,29 @@ const FloatingPlayer: React.FC<Props> = ({
         {/* Extras */}
         <div className="w-[180px] flex items-center justify-end gap-6 shrink-0 relative z-10 font-bold">
            <div className="flex flex-col items-end">
-              <span className="text-[8px] uppercase tracking-widest opacity-20">Rate</span>
-              <span className="text-xs">{effects.speed.toFixed(2)}x</span>
+              <span className="text-[8px] uppercase tracking-widest opacity-20">Grade</span>
+              <span className={cn("text-xs font-black", effects.quality === 'pro' ? "text-[var(--color-primary)]" : "")}>
+                {effects.quality.toUpperCase()}
+              </span>
            </div>
-           <div className="m3-chip bg-[var(--color-primary)] text-[var(--color-on-primary)] border-none">STUDIO</div>
+           {onExport ? (
+                <button 
+                  onClick={onExport} 
+                  className={cn(
+                    "m3-button m3-button-primary scale-75 origin-right",
+                    isMetro ? "rounded-none" : ""
+                  )}
+                >
+                  Render
+                </button>
+           ) : (
+                <div className={cn(
+                    "m3-chip bg-[var(--color-primary)] text-[var(--color-on-primary)] border-none",
+                    isMetro ? "rounded-none" : ""
+                )}>
+                  STUDIO
+                </div>
+           )}
         </div>
       </motion.div>
     </div>

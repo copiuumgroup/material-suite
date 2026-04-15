@@ -1,10 +1,12 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Play, Pause, SkipForward, SkipBack, Music, Sparkles, Zap, MicOff, Folder, Share } from 'lucide-react';
+import { Play, Pause, SkipForward, SkipBack, Music, Sparkles, Zap, MicOff, Folder, Share, X } from 'lucide-react';
 import Waveform from '../Waveform';
 import StudioVisualizer from '../StudioVisualizer';
 import type { Track } from '../types';
 import type { StudioEffectParams } from '../services/engine/AlgorithmEngine';
+
+import type { ImpulseData } from '../db/database';
 
 interface Props {
   track: Track | null;
@@ -17,6 +19,11 @@ interface Props {
   effects: StudioEffectParams;
   setEffects: (effects: StudioEffectParams) => void;
   onExport: () => void;
+  impulses: ImpulseData[];
+  onIRUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onIRSelect: (id: number | null) => void;
+  onIRDelete: (id: number) => void;
+  uiMode: 'material' | 'metro';
 }
 
 const StudioView: React.FC<Props> = ({ 
@@ -29,8 +36,14 @@ const StudioView: React.FC<Props> = ({
   analyser,
   effects,
   setEffects,
-  onExport
+  onExport,
+  impulses,
+  onIRUpload,
+  onIRSelect,
+  onIRDelete,
+  uiMode
 }) => {
+  const isMetro = uiMode === 'metro';
   
   const toggleSlowed = () => {
     if (effects.speed === 0.8 && effects.reverbWet === 0.4) {
@@ -66,30 +79,42 @@ const StudioView: React.FC<Props> = ({
 
   return (
     <motion.div 
-      initial={{ opacity: 0, scale: 0.98 }} 
-      animate={{ opacity: 1, scale: 1 }} 
+      initial={{ opacity: 0, x: isMetro ? -100 : 0 }} 
+      animate={{ opacity: 1, x: 0 }} 
       className="flex-1 flex flex-col gap-10 py-12 px-10 overflow-hidden relative"
     >
-      <div className="flex justify-between items-start shrink-0 z-10">
+      {/* Giant Windows 8.1 Header Overlay */}
+      {isMetro && (
+           <div className="absolute top-[-20px] left-[-20px] pointer-events-none opacity-[0.03] select-none z-0">
+               <h1 className="text-[240px] font-black uppercase tracking-tighter leading-none">STU<br/>DIO</h1>
+               <p className="text-[20px] font-bold tracking-[1em] ml-4 mt-[-40px]">ADVANCED ENGINE NODE</p>
+           </div>
+       )}
+
+      <div className="flex justify-between items-start shrink-0 relative z-10">
         <div className="flex flex-col gap-2">
-          <h1 className="text-8xl font-black tracking-tighter uppercase leading-[0.7] text-[var(--color-on-surface)] select-none">
+          <h1 className={cn("font-black tracking-tighter uppercase leading-[0.7] text-[var(--color-on-surface)] select-none", isMetro ? "text-9xl" : "text-7xl")}>
             Material<br /><span className="text-[var(--color-primary)] opacity-20 italic">Studio</span>
           </h1>
           <span className="text-[10px] font-black uppercase tracking-[0.5em] opacity-40 ml-1">Advanced Algorithm Engine</span>
         </div>
 
         <div className="flex gap-4">
-             <button className="m3-button opacity-40 hover:opacity-100"><Folder className="w-4 h-4" /> Config</button>
-             <button onClick={onExport} className="m3-button m3-button-primary"><Share className="w-4 h-4" /> Render Master</button>
+             <button className={cn("m3-button opacity-40 hover:opacity-100", isMetro ? "rounded-none border border-[var(--color-outline)]" : "")}>
+                <Folder className={cn("w-4 h-4", isMetro ? "fill-current" : "")} /> Config
+             </button>
+             <button onClick={onExport} className={cn("m3-button m3-button-primary", isMetro ? "rounded-none" : "")}>
+                <Share className={cn("w-4 h-4", isMetro ? "fill-current" : "")} /> Render Master
+             </button>
         </div>
       </div>
 
       <div className="flex-1 grid grid-cols-12 gap-10 min-h-0 relative z-10">
           {/* Main Visualizer & Waveform Workspace */}
           <div className="col-span-12 lg:col-span-8 flex flex-col gap-8">
-              <div className="flex-1 m3-glass-deep rounded-5xl border border-[var(--color-outline)] overflow-hidden relative shadow-2xl">
+              <div className={cn("flex-1 border border-[var(--color-outline)] overflow-hidden relative", isMetro ? "bg-black rounded-none" : "m3-glass-deep rounded-5xl shadow-2xl")}>
                   <StudioVisualizer analyser={analyser} audioCtx={null} />
-                  <div className="absolute inset-0 bg-gradient-to-t from-[var(--color-surface)]/80 via-transparent to-transparent pointer-events-none" />
+                  <div className={cn("absolute inset-0 pointer-events-none", isMetro ? "bg-gradient-to-t from-black/80 to-transparent" : "bg-gradient-to-t from-[var(--color-surface)]/80 via-transparent to-transparent")} />
                   
                   <div className="absolute bottom-10 left-10 right-10 flex flex-col gap-6">
                       <div className="flex items-end justify-between px-2">
@@ -103,43 +128,55 @@ const StudioView: React.FC<Props> = ({
                               <span>{formatTime(duration)}</span>
                           </div>
                       </div>
-                      <div className="h-24 flex items-center m3-glass-subtle rounded-4xl px-8 border border-[var(--color-outline)]">
+                      <div className={cn("h-24 flex items-center px-8 border border-[var(--color-outline)]", isMetro ? "bg-black rounded-none" : "m3-glass-subtle rounded-4xl")}>
                           <Waveform buffer={track.buffer!} currentTime={currentTime} duration={duration} onSeek={seekTo} />
                       </div>
                   </div>
               </div>
 
-              <div className="m3-glass-subtle rounded-4xl p-8 flex items-center justify-between border border-[var(--color-outline)]">
+              <div className={cn("p-8 flex items-center justify-between border border-[var(--color-outline)]", isMetro ? "bg-black rounded-none" : "m3-glass-subtle rounded-4xl")}>
                   <div className="flex items-center gap-6">
-                      <button className="p-4 opacity-30 hover:opacity-100 transition-all active:scale-90"><SkipBack className="w-6 h-6" /></button>
+                      <button className="p-4 opacity-30 hover:opacity-100 transition-all active:scale-95"><SkipBack className="w-6 h-6" /></button>
                       <button 
                         onClick={() => setIsPlaying(!isPlaying)}
-                        className="w-20 h-20 bg-[var(--color-primary)] text-[var(--color-on-primary)] rounded-[40px] flex items-center justify-center shadow-2xl hover:scale-105 active:scale-95 transition-all duration-300"
+                        className={cn(
+                            "w-20 h-20 bg-[var(--color-primary)] text-[var(--color-on-primary)] flex items-center justify-center transition-all duration-300",
+                            isMetro ? "rounded-none" : "rounded-[40px] shadow-2xl hover:scale-105 active:scale-95"
+                        )}
                       >
                         {isPlaying ? <Pause className="w-8 h-8 fill-current" /> : <Play className="w-8 h-8 fill-current ml-1" />}
                       </button>
-                      <button className="p-4 opacity-30 hover:opacity-100 transition-all active:scale-90"><SkipForward className="w-6 h-6" /></button>
+                      <button className="p-4 opacity-30 hover:opacity-100 transition-all active:scale-95"><SkipForward className="w-6 h-6" /></button>
                   </div>
 
-                  <div className="flex items-center gap-4 m3-glass-subtle p-2 rounded-[32px] border border-[var(--color-outline)] shadow-inner">
+                  <div className={cn("flex items-center gap-4 p-2 border border-[var(--color-outline)]", isMetro ? "bg-black rounded-none shadow-none" : "m3-glass-subtle rounded-[32px] shadow-inner")}>
                       <button 
                          onClick={toggleSlowed}
-                         className={cn("px-8 py-4 rounded-[24px] flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all", isSlowed ? "bg-[var(--color-primary)] text-[var(--color-on-primary)]" : "opacity-30 hover:opacity-100")}
+                         className={cn("px-8 py-4 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all", isSlowed ? "bg-[var(--color-primary)] text-[var(--color-on-primary)]" : "opacity-30 hover:opacity-100", isMetro ? "rounded-none" : "rounded-[24px]")}
                       >
                          <Sparkles className="w-4 h-4" /> Slowed + Reverb
                       </button>
                       <button 
                          onClick={toggleNightcore}
-                         className={cn("px-8 py-4 rounded-[24px] flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all", effects.isNightcore ? "bg-[var(--color-primary)] text-[var(--color-on-primary)]" : "opacity-30 hover:opacity-100")}
+                         className={cn("px-8 py-4 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all", effects.isNightcore ? "bg-[var(--color-primary)] text-[var(--color-on-primary)]" : "opacity-30 hover:opacity-100", isMetro ? "rounded-none" : "rounded-[24px]")}
                       >
                          <Zap className="w-4 h-4" /> Nightcore
                       </button>
                       <div className="w-px h-8 bg-[var(--color-outline)] mx-2" />
                       <button 
                          onClick={toggleVocal}
-                         className={cn("px-8 py-4 rounded-[24px] flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all", effects.isVocalReduced ? "bg-red-600 text-white" : "opacity-30 hover:opacity-100")}
+                         className={cn("px-8 py-4 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all", effects.isVocalReduced ? "bg-red-600 text-white" : "opacity-30 hover:opacity-100", isMetro ? "rounded-none" : "rounded-[24px]")}
                       >
                          <MicOff className="w-4 h-4" /> Vocal Reducer
+                      </button>
+                      
+                      <div className="w-px h-8 bg-[var(--color-outline)] mx-2" />
+                      
+                      <button 
+                         onClick={() => setEffects({ ...effects, isAutoEQEnabled: !effects.isAutoEQEnabled })}
+                         className={cn("px-8 py-4 flex items-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all", effects.isAutoEQEnabled ? "bg-cyan-500 text-white" : "opacity-30 hover:opacity-100", isMetro ? "rounded-none" : "rounded-[24px]")}
+                      >
+                         <Sparkles className="w-4 h-4" /> Auto-EQ
                       </button>
                   </div>
               </div>
@@ -147,43 +184,96 @@ const StudioView: React.FC<Props> = ({
 
           {/* Right Panel: Rack/Details */}
           <div className="col-span-12 lg:col-span-4 flex flex-col gap-8">
-              <div className="flex-1 m3-glass-subtle rounded-5xl border border-[var(--color-outline)] p-10 flex flex-col gap-8 shadow-2xl">
+              <div className={cn("flex-1 border border-[var(--color-outline)] p-10 flex flex-col gap-8", isMetro ? "bg-black rounded-none shadow-none" : "m3-glass-subtle rounded-5xl shadow-2xl")}>
                   <div className="flex items-center justify-between">
                       <h3 className="text-xl font-black uppercase tracking-tighter">Chain Status</h3>
                       <div className="m3-chip">NODE-01</div>
                   </div>
 
                   <div className="flex flex-col gap-6">
-                      <div className="flex flex-col gap-2">
-                          <div className="flex justify-between text-[10px] font-black uppercase tracking-widest opacity-40">
-                              <span>Playback Rate</span>
-                              <span>{effects.speed.toFixed(2)}x</span>
-                          </div>
-                          <div className="h-1.5 w-full bg-[var(--color-surface)]/20 rounded-full overflow-hidden">
-                              <motion.div 
-                                initial={{ width: 0 }}
-                                animate={{ width: `${(effects.speed / 2) * 100}%` }}
-                                className="h-full bg-[var(--color-primary)] shadow-[0_0_15px_var(--color-primary)]"
-                              />
-                          </div>
+                      <div className="flex flex-col gap-3">
+                           <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Mastering Grade</span>
+                           <div className={cn("flex p-1 border border-[var(--color-outline)]", isMetro ? "bg-[var(--color-surface)]/10 rounded-none" : "m3-glass-subtle rounded-2xl")}>
+                               <button 
+                                 onClick={() => setEffects({ ...effects, quality: 'fast' })}
+                                 className={cn("flex-1 py-2 text-[9px] font-black uppercase transition-all", effects.quality === 'fast' ? "bg-[var(--color-surface)] text-[var(--color-on-surface)]" : "opacity-30", isMetro ? "rounded-none" : "rounded-xl")}
+                               >
+                                 Fast
+                               </button>
+                               <button 
+                                 onClick={() => setEffects({ ...effects, quality: 'pro' })}
+                                 className={cn("flex-1 py-2 text-[9px] font-black uppercase transition-all", effects.quality === 'pro' ? "bg-[var(--color-primary)] text-[var(--color-on-primary)] shadow-lg" : "opacity-30", isMetro ? "rounded-none" : "rounded-xl")}
+                               >
+                                 Pro (Ultra)
+                               </button>
+                           </div>
+                      </div>
+
+                      <div className="flex flex-col gap-3">
+                           <div className="flex justify-between items-center">
+                               <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Impulse Vault</span>
+                               <label className={cn("text-[8px] font-black uppercase tracking-widest bg-[var(--color-primary)] text-[var(--color-on-primary)] px-3 py-1 cursor-pointer transition-all", isMetro ? "rounded-none" : "rounded-full hover:scale-105 active:scale-95")}>
+                                   Load .WAV
+                                   <input type="file" accept=".wav" className="hidden" onChange={onIRUpload} />
+                               </label>
+                           </div>
+                           <div className="flex flex-col gap-2 max-h-32 overflow-y-auto no-scrollbar">
+                               <button 
+                                 onClick={() => onIRSelect(null)}
+                                 className={cn("text-left px-4 py-3 text-[9px] font-bold uppercase tracking-wider border border-[var(--color-outline)] transition-all", !effects.irId ? "bg-[var(--color-primary)]/10 border-[var(--color-primary)]/40 text-[var(--color-primary)]" : "opacity-40 hover:opacity-100", isMetro ? "rounded-none" : "rounded-2xl")}
+                               >
+                                 System Engine (Mathematical)
+                               </button>
+                               {impulses.map((impulse: ImpulseData) => (
+                                   <div key={impulse.id} className="relative group">
+                                       <button 
+                                         onClick={() => onIRSelect(impulse.id!)}
+                                         className={cn("w-full text-left px-4 py-3 text-[9px] font-bold uppercase tracking-wider border border-[var(--color-outline)] transition-all flex justify-between items-center", effects.irId === impulse.id ? "bg-[var(--color-primary)]/10 border-[var(--color-primary)]/40 text-[var(--color-primary)]" : "opacity-40 hover:opacity-100", isMetro ? "rounded-none" : "rounded-2xl")}
+                                       >
+                                         <span className="truncate pr-4">{impulse.name}</span>
+                                         <span className="opacity-40 text-[8px]">{impulse.duration.toFixed(1)}s</span>
+                                       </button>
+                                       <button 
+                                          onClick={() => onIRDelete(impulse.id!)}
+                                          className="absolute right-2 top-1/2 -translate-y-1/2 p-2 opacity-0 group-hover:opacity-100 text-red-500 hover:scale-110"
+                                       >
+                                          <X className="w-3 h-3" />
+                                       </button>
+                                   </div>
+                               ))}
+                           </div>
                       </div>
 
                       <div className="flex flex-col gap-2">
-                          <div className="flex justify-between text-[10px] font-black uppercase tracking-widest opacity-40">
-                              <span>Reverb Wetness</span>
-                              <span>{Math.round(effects.reverbWet * 100)}%</span>
-                          </div>
-                          <div className="h-1.5 w-full bg-[var(--color-surface)]/20 rounded-full overflow-hidden">
-                              <motion.div 
-                                initial={{ width: 0 }}
-                                animate={{ width: `${effects.reverbWet * 100}%` }}
-                                className="h-full bg-[var(--color-primary)] shadow-[0_0_15px_var(--color-primary)]"
-                              />
-                          </div>
+                           <div className="flex justify-between text-[10px] font-black uppercase tracking-widest opacity-40">
+                               <span>Playback Rate</span>
+                               <span>{effects.speed.toFixed(2)}x</span>
+                           </div>
+                           <div className={cn("h-1.5 w-full bg-[var(--color-surface)]/20 overflow-hidden", isMetro ? "rounded-none" : "rounded-full")}>
+                               <motion.div 
+                                 initial={{ width: 0 }}
+                                 animate={{ width: `${(effects.speed / 2) * 100}%` }}
+                                 className="h-full bg-[var(--color-primary)] shadow-[0_0_15px_var(--color-primary)]"
+                               />
+                           </div>
+                      </div>
+
+                      <div className="flex flex-col gap-2">
+                           <div className="flex justify-between text-[10px] font-black uppercase tracking-widest opacity-40">
+                               <span>Reverb Wetness</span>
+                               <span>{Math.round(effects.reverbWet * 100)}%</span>
+                           </div>
+                           <div className={cn("h-1.5 w-full bg-[var(--color-surface)]/20 overflow-hidden", isMetro ? "rounded-none" : "rounded-full")}>
+                               <motion.div 
+                                 initial={{ width: 0 }}
+                                 animate={{ width: `${effects.reverbWet * 100}%` }}
+                                 className="h-full bg-[var(--color-primary)] shadow-[0_0_15px_var(--color-primary)]"
+                               />
+                           </div>
                       </div>
                   </div>
 
-                  <div className="mt-auto p-6 m3-glass-subtle rounded-4xl border border-[var(--color-outline)] flex flex-col gap-4">
+                  <div className={cn("mt-auto p-6 border border-[var(--color-outline)] flex flex-col gap-4", isMetro ? "bg-black rounded-none" : "m3-glass-subtle rounded-4xl")}>
                       <div className="flex items-center gap-3">
                           <div className="w-2 h-2 rounded-full bg-[var(--color-primary)] animate-pulse" />
                           <span className="text-[10px] font-black uppercase tracking-widest opacity-60">Engine Telemetry</span>

@@ -2,17 +2,19 @@ import React, { useState, useEffect } from 'react';
 import { useAudioEngine } from './useAudioEngine';
 import VaultView from './views/VaultView';
 import StudioView from './views/StudioView';
-import TransmissionView from './views/TransmissionView';
+import YTDLPView from './views/YTDLPView';
 import SidebarRail from './components/SidebarRail';
+import { SettingsModal } from './components/SettingsModal';
 import type { ViewType } from './components/SidebarRail';
-import { db } from './db/database';
-import type { ProjectMetadata } from './db/database';
+import { db, type ProjectMetadata, type ImpulseData } from './db/database';
 import type { Track } from './types';
-import { studioEngine } from './services/engine/AlgorithmEngine';
-import type { StudioEffectParams } from './services/engine/AlgorithmEngine';
+import { studioEngine, type StudioEffectParams } from './services/engine/AlgorithmEngine';
 import { AnimatePresence, motion } from 'framer-motion';
 import MatrixBackground from './components/MatrixBackground';
 import FloatingPlayer from './components/FloatingPlayer';
+import { cn, generateId } from './utils';
+import { getAudioContext, resumeAudioContext } from './services/engine/audioContext';
+import { useToaster } from './components/Toaster';
 import { useExporter } from './useExporter';
 
 declare global {
@@ -23,7 +25,7 @@ declare global {
       saveFile: (fileName: string, buffer: ArrayBuffer) => Promise<string>;
       selectDownloadDirectory: () => Promise<string | null>;
       ytdlpDownload: (url: string, options?: { quality?: 'mp3' | 'wav'; mode?: 'audio' | 'video'; destinationPath?: string }) => Promise<{ success: boolean; error?: string }>;
-      ytdlpGetInfo: (url: string) => Promise<{ success: boolean; info?: any; error?: string }>;
+      ytdlpGetInfo: (url: string) => Promise<{ success: boolean; info?: any; infos?: any[]; error?: string }>;
       ytdlpCancel: () => Promise<boolean>;
       openMusicFolder: () => Promise<boolean>;
       openAppDataFolder: () => Promise<boolean>;
@@ -34,6 +36,7 @@ declare global {
       cacheAudioFile: (sourcePath: string | null, fileName: string, buffer?: ArrayBuffer) => Promise<string | null>;
       extractAudio: (path: string) => Promise<ArrayBuffer | null>;
       onYtdlpLog: (callback: (data: string) => void) => () => void;
+      updateTitleBarOverlay: (settings: { color: string; symbolColor: string; height?: number }) => Promise<boolean>;
     };
   }
 }
@@ -41,8 +44,36 @@ declare global {
 function App() {
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('studio-theme');
-    return (saved as 'light' | 'dark') || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+    return (saved as 'light' | 'dark') || 'dark';
   });
+
+  const [uiMode, setUiMode] = useState<'material' | 'metro'>(() => {
+    const saved = localStorage.getItem('ui-mode');
+    return (saved as 'material' | 'metro') || 'material';
+  });
+
+  useEffect(() => {
+    localStorage.setItem('ui-mode', uiMode);
+    // Add or remove metro class on body for global CSS overrides
+    if (uiMode === 'metro') {
+        document.body.classList.add('metro-mode');
+    } else {
+        document.body.classList.remove('metro-mode');
+    }
+  }, [uiMode]);
+
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [limiterSettings, setLimiterSettings] = useState({
+    threshold: -3.0,
+    ratio: 12,
+    attack: 0.003,
+    release: 0.25
+  });
+
+  // Sync Limiter Settings to Effects
+  useEffect(() => {
+    setEffects(prev => ({ ...prev, limiter: limiterSettings }));
+  }, [limiterSettings]);
 
   useEffect(() => {
     localStorage.setItem('studio-theme', theme);
@@ -62,8 +93,42 @@ function App() {
     speed: 1.0,
     reverbWet: 0,
     isNightcore: false,
-    isVocalReduced: false
+    isVocalReduced: false,
+    quality: 'fast',
+    isAutoEQEnabled: false,
+    customIRBuffer: null
   });
+
+  // Sync Title Bar to Theme/Mode
+  useEffect(() => {
+    if (window.electronAPI) {
+      window.electronAPI.updateTitleBarOverlay({
+        color: '#00000000',
+        symbolColor: theme === 'dark' ? '#ffffff' : '#000000',
+        height: 38
+      });
+    }
+  }, [theme, uiMode]);
+
+  // Sync Analysis to Effects
+  useEffect(() => {
+    if (activeTrack?.analysis) {
+        setEffects(prev => ({ ...prev, analysis: activeTrack.analysis }));
+    }
+  }, [activeTrackId, tracks]);
+
+  const [impulses, setImpulses] = useState<ImpulseData[]>([]);
+
+  // Load Impulses from DB
+  useEffect(() => {
+    const loadImpulses = async () => {
+        const data = await db.impulses.toArray();
+        setImpulses(data);
+    };
+    loadImpulses();
+  }, []);
+
+  const { toast } = useToaster();
 
   const {
     isPlaying,
@@ -71,19 +136,22 @@ function App() {
     currentTime,
     duration,
     seekTo,
-    audioCtx,
     analyser
   } = useAudioEngine(activeTrack?.buffer || null, effects);
+
+  const audioCtx = getAudioContext();
 
   useEffect(() => {
     document.body.classList.add('is-windows');
   }, []);
 
+  // Optimized Background Decoding
   useEffect(() => {
-    if (!audioCtx) return;
     tracks.forEach(async (track: Track) => {
       if (track.isReady || track.buffer || track.file.size === 0) return;
+      
       try {
+        await resumeAudioContext();
         const arrayBuffer = await track.file.arrayBuffer();
         let decodedBuffer: AudioBuffer;
 
@@ -106,8 +174,10 @@ function App() {
         setTracks((prev: Track[]) => prev.map((t: Track) =>
           t.id === track.id ? { ...t, buffer: decodedBuffer, isReady: true } : t
         ));
+        toast(`Ready: ${track.file.name}`, 'success');
       } catch (err: any) {
-        console.error('Decoding Error:', err);
+        console.error(`Decoding Error [${track.file.name}]:`, err);
+        toast(`Failed to load ${track.file.name}`, 'error');
       }
     });
   }, [tracks, audioCtx]);
@@ -116,7 +186,7 @@ function App() {
     if (e.target.files && e.target.files.length > 0) {
       const newFiles = Array.from(e.target.files);
       const newTracks: Track[] = newFiles.map((file: File) => ({
-        id: Math.random().toString(36).substring(2, 9),
+        id: generateId(),
         file,
         buffer: null,
         isReady: false
@@ -138,6 +208,45 @@ function App() {
       // Automatically switch to studio view when uploading
       setCurrentView('studio');
       setIsPlayerDismissed(false);
+      resumeAudioContext();
+    }
+  };
+
+  const handleIRUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+        const file = e.target.files[0];
+        try {
+            const arrayBuffer = await file.arrayBuffer();
+            const decoded = await audioCtx.decodeAudioData(arrayBuffer.slice(0));
+            
+            const impulse: ImpulseData = {
+                name: file.name,
+                data: arrayBuffer,
+                duration: decoded.duration,
+                addedAt: Date.now()
+            };
+            
+            const id = await db.impulses.add(impulse);
+            impulse.id = id as number;
+            setImpulses(prev => [...prev, impulse]);
+            setEffects(prev => ({ ...prev, customIRBuffer: decoded, irId: impulse.id }));
+            toast(`Impulse Loaded: ${file.name}`, 'success');
+        } catch (err) {
+            console.error('IR Load Error:', err);
+            toast('Failed to load IR (.wav only)', 'error');
+        }
+    }
+  };
+
+  const selectImpulse = async (id: number | null) => {
+    if (id === null) {
+        setEffects(prev => ({ ...prev, customIRBuffer: null, irId: undefined }));
+        return;
+    }
+    const impulse = impulses.find(i => i.id === id);
+    if (impulse) {
+        const decoded = await audioCtx.decodeAudioData(impulse.data.slice(0));
+        setEffects(prev => ({ ...prev, customIRBuffer: decoded, irId: impulse.id }));
     }
   };
 
@@ -157,7 +266,7 @@ function App() {
     }
 
     const loadedTrack: Track = {
-      id: Math.random().toString(36).substring(2, 9),
+      id: generateId(),
       file: projectFile,
       buffer: null,
       isReady: false,
@@ -172,6 +281,7 @@ function App() {
     setActiveTrackId(loadedTrack.id);
     setCurrentView('studio');
     setIsPlayerDismissed(false);
+    resumeAudioContext();
   };
 
   const handleExport = async () => {
@@ -187,36 +297,61 @@ function App() {
       if (blob && window.electronAPI) {
         const arrayBuffer = await blob.arrayBuffer();
         await window.electronAPI.saveFile(activeTrack.file.name, arrayBuffer);
+        toast(`Exported: ${activeTrack.file.name}`, 'success');
       }
     } catch (error) {
       console.error('Export Failed:', error);
+      toast('Export Failed', 'error');
     }
   };
 
   return (
-    <div className={cn("w-full h-screen overflow-hidden flex transition-all duration-1000 is-windows bg-[var(--color-surface)]")}>
-      <div className="fixed top-0 left-0 w-full h-8 title-bar-drag z-[100]" />
+    <div className={cn(
+        "w-full h-screen overflow-hidden flex transition-all duration-1000 is-windows bg-[var(--color-surface)]",
+        uiMode === 'metro' ? 'metro-mode' : ''
+    )}>
+      <div className="fixed top-0 left-0 w-[calc(100%-144px)] h-[38px] title-bar-drag z-[100]" />
       
       <SidebarRail 
         currentView={currentView} 
         setView={setCurrentView} 
-        onOpenAppData={async () => {
-          if (window.electronAPI) await window.electronAPI.openAppDataFolder();
-        }}
         theme={theme}
         setTheme={setTheme}
+        uiMode={uiMode}
+        setUiMode={setUiMode}
+        onOpenSettings={() => setIsSettingsOpen(true)}
+      />
+
+      <SettingsModal 
+        isOpen={isSettingsOpen}
+        onClose={() => setIsSettingsOpen(false)}
+        theme={theme}
+        setTheme={setTheme}
+        uiMode={uiMode}
+        setUiMode={setUiMode}
+        limiter={limiterSettings}
+        setLimiter={setLimiterSettings}
       />
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col relative overflow-hidden bg-[var(--color-surface)]">
         <div className="flex-1 flex flex-col relative z-20 overflow-hidden">
           <AnimatePresence mode="wait">
+            <motion.div
+              key={currentView}
+              initial={uiMode === 'metro' ? { x: 50, opacity: 0 } : { opacity: 0, scale: 0.98 }}
+              animate={{ x: 0, opacity: 1, scale: 1 }}
+              exit={uiMode === 'metro' ? { x: -50, opacity: 0 } : { opacity: 0, scale: 0.98 }}
+              transition={uiMode === 'metro' ? { duration: 0.15, ease: [0.1, 0.9, 0.2, 1] } : { duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
+              className="flex-1 flex flex-col min-h-0"
+            >
           {currentView === 'vault' && (
             <VaultView 
               key="vault"
               onUpload={handleFileUpload} 
               onOpenProject={openProject} 
               onDeleteProject={async (id) => await db.projects.delete(id)} 
+              uiMode={uiMode}
             />
           )}
           {currentView === 'studio' && (
@@ -232,17 +367,27 @@ function App() {
               effects={effects}
               setEffects={setEffects}
               onExport={handleExport}
+              impulses={impulses}
+              onIRUpload={handleIRUpload}
+              onIRSelect={selectImpulse}
+              onIRDelete={async (id) => {
+                  await db.impulses.delete(id);
+                  setImpulses(prev => prev.filter(i => i.id !== id));
+                  if (effects.irId === id) selectImpulse(null);
+              }}
+              uiMode={uiMode}
             />
           )}
-          {currentView === 'transmission' && (
-            <TransmissionView key="transmission" />
+          {currentView === 'yt-dlp' && (
+            <YTDLPView key="yt-dlp" uiMode={uiMode} />
           )}
+          </motion.div>
         </AnimatePresence>
         </div>
 
         {/* Backdrop Matrix */}
         <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden pb-16">
-            <MatrixBackground />
+            {uiMode !== 'metro' && <MatrixBackground />}
         </div>
       </main>
 
@@ -261,16 +406,14 @@ function App() {
                effects={effects}
                setEffects={setEffects}
                onClose={() => setIsPlayerDismissed(true)}
+               onExport={handleExport}
+               uiMode={uiMode}
              />
           </motion.div>
         )}
       </AnimatePresence>
     </div>
   );
-}
-
-function cn(...inputs: (string | undefined | null | false)[]) {
-  return inputs.filter(Boolean).join(' ');
 }
 
 export default App;

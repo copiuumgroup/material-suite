@@ -42,7 +42,7 @@
 
   body {
     @apply bg-[var(--color-surface)] text-[var(--color-on-surface)] antialiased overflow-hidden;
-    font-family: 'Outfit', 'Segoe UI', system-ui, sans-serif;
+    font-family: 'Segoe UI Semilight', 'Segoe UI', 'Outfit', system-ui, sans-serif;
   }
 }
 
@@ -101,9 +101,10 @@
 }
 
 .m3-glass-deep {
-  @apply backdrop-blur-3xl bg-[rgba(var(--color-surface-rgb),0.6)];
+  @apply backdrop-blur-3xl bg-[rgba(var(--color-surface-rgb),0.7)];
   will-change: backdrop-filter, transform;
   transform: translateZ(0);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
 }
 
 .title-bar-drag {
@@ -122,4 +123,47 @@
 .vertical-text {
   writing-mode: vertical-rl;
   text-orientation: mixed;
+}
+
+/* --- METRO UI MODE (Windows 8.1 Performance) --- */
+.metro-mode {
+  --radius-4xl: 0px !important;
+  --radius-5xl: 0px !important;
+  --radius-full: 0px !important;
+}
+
+.metro-mode * {
+  border-radius: 0px !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+}
+
+.metro-mode .m3-glass-subtle,
+.metro-mode .m3-glass-deep {
+  background: var(--color-surface) !important;
+  backdrop-filter: none !important;
+}
+
+.metro-mode .metro-charm {
+  @apply fixed top-0 right-0 h-full w-[350px] bg-[var(--color-surface)] border-l border-[var(--color-outline)] shadow-none z-[110];
+}
+
+.metro-mode .m3-button {
+  @apply rounded-none;
+}
+
+.metro-mode .m3-chip {
+  @apply rounded-none bg-[var(--color-outline)] border border-[var(--color-primary)]/20;
+}
+
+/* Disable all smooth transitions for maximum snappiness in Metro mode */
+.metro-mode .transition-all,
+.metro-mode .transition-opacity,
+.metro-mode .transition-transform {
+  transition-duration: 150ms !important;
+  transition-timing-function: cubic-bezier(0.1, 0.9, 0.2, 1) !important;
+}
+
+.metro-mode .animate-float {
+  animation: none !important;
 }

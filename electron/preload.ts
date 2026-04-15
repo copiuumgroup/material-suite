@@ -23,5 +23,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     const listener = (_event: any, data: string) => callback(data);
     ipcRenderer.on('ytdlp-log', listener);
     return () => ipcRenderer.removeListener('ytdlp-log', listener);
-  }
+  },
+  updateTitleBarOverlay: (settings: any) => ipcRenderer.invoke('update-titlebar-overlay', settings)
 });

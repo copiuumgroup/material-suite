@@ -1,3 +1,5 @@
+import type { AnalysisResult } from './services/analyzer';
+
 export interface Track {
   id: string;
   file: File;
@@ -10,4 +12,5 @@ export interface Track {
   };
   internalPath?: string;
   needsRelink?: boolean;
+  analysis?: AnalysisResult;
 }

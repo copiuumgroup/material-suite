@@ -1,7 +1,7 @@
 {
   "name": "material-audio-tool",
   "private": true,
-  "version": "1.0.0-004",
+  "version": "1.0.0-01A",
   "type": "module",
   "main": "dist-electron/main.js",
   "description": "Material Audio Mastery Studio",
@@ -64,7 +64,6 @@
     "win": {
       "icon": "build/icon.png",
       "target": [
-        "nsis",
         "portable"
       ]
     },

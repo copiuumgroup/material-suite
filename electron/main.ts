@@ -8,6 +8,7 @@ import os from 'os';
 
 const activeProcesses = new Map<string, any>();
 const MAX_BUFFER_SIZE = 512 * 1024 * 1024; // 512MB Limit
+let mainWindow: BrowserWindow | null = null;
 
 function isPathSafe(filePath: string) {
   try {
@@ -54,13 +55,15 @@ function createWindow() {
     },
     titleBarStyle: 'hidden',
     titleBarOverlay: {
+      height: 38,
       color: '#00000000',
-      symbolColor: '#ffffff',
-      height: 32
+      symbolColor: '#ffffff'
     },
-    transparent: true,
-    backgroundColor: '#00000000',
+    transparent: false,
+    backgroundColor: '#000000',
   });
+
+  mainWindow = win;
 
   const osRelease = os.release().split('.');
   if (parseInt(osRelease[0]) >= 10 && parseInt(osRelease[2]) >= 22000) {
@@ -137,6 +140,14 @@ app.whenReady().then(() => {
 // NATIVE HANDLERS
 ipcMain.handle('get-music-path', () => app.getPath('music'));
 
+ipcMain.handle('update-titlebar-overlay', (_event: IpcMainInvokeEvent, settings: any) => {
+  if (mainWindow) {
+    mainWindow.setTitleBarOverlay(settings);
+    return true;
+  }
+  return false;
+});
+
 ipcMain.handle('extract-audio', async (_event: IpcMainInvokeEvent, filePath: string) => {
   if (!isPathSafe(filePath)) return null;
 
@@ -200,6 +211,7 @@ ipcMain.handle('get-metadata', async (_event: IpcMainInvokeEvent, filePath: stri
 
 ipcMain.handle('ytdlp-get-info', async (_event: IpcMainInvokeEvent, trackUrl: string) => {
   return new Promise((resolve) => {
+    // --flat-playlist gives us metadata without downloading
     const args = ['--dump-json', '--flat-playlist', '--no-warnings', '--', trackUrl];
     const process = spawn('yt-dlp', args);
     let output = '';
@@ -208,18 +220,27 @@ ipcMain.handle('ytdlp-get-info', async (_event: IpcMainInvokeEvent, trackUrl: st
     process.on('close', (code: number) => {
       if (code === 0) {
         try {
-          const info = JSON.parse(output);
-          resolve({
-            success: true,
-            info: {
-              title: info.title,
-              uploader: info.uploader || info.channel,
-              duration: info.duration,
-              thumbnail: info.thumbnail || (info.thumbnails && info.thumbnails[0]?.url),
-              webpage_url: info.webpage_url
-            }
-          });
-        } catch (e) { resolve({ success: false, error: 'Failed to parse metadata' }); }
+          // Playlist/Profiles return multiple lines of JSON
+          const lines = output.trim().split('\n');
+          const results = lines.map(line => {
+            try {
+              const info = JSON.parse(line);
+              return {
+                title: info.title || info.display_id || 'Untitled',
+                uploader: info.uploader || info.channel || info.uploader_id,
+                duration: info.duration || 0,
+                thumbnail: info.thumbnail || (info.thumbnails && info.thumbnails[0]?.url),
+                webpage_url: info.webpage_url || trackUrl
+              };
+            } catch (e) { return null; }
+          }).filter(Boolean);
+
+          if (results.length > 0) {
+            resolve({ success: true, infos: results });
+          } else {
+            resolve({ success: false, error: 'No valid metadata found in output' });
+          }
+        } catch (e) { resolve({ success: false, error: 'Corrupt metadata stream' }); }
       } else { resolve({ success: false, error: 'yt-dlp failed to fetch metadata' }); }
     });
     process.on('error', (err: any) => resolve({ success: false, error: err.message }));
