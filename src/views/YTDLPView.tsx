@@ -19,12 +19,9 @@ interface QueueItem {
   error?: string;
 }
 
-interface Props {
-  uiMode: 'material' | 'metro';
-}
+interface Props {}
 
-const YTDLPView: React.FC<Props> = ({ uiMode }) => {
-  const isMetro = uiMode === 'metro';
+const YTDLPView: React.FC<Props> = () => {
   const [cloudUrls, setCloudUrls] = useState('');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [stagedItems, setStagedItems] = useState<StagedItem[]>([]);
@@ -165,21 +162,13 @@ const YTDLPView: React.FC<Props> = ({ uiMode }) => {
 
   return (
     <motion.div 
-      initial={{ opacity: 0, x: isMetro ? -100 : 0 }} 
-      animate={{ opacity: 1, x: 0 }} 
+      initial={{ opacity: 0 }} 
+      animate={{ opacity: 1 }} 
       className="flex-1 flex flex-col gap-10 py-12 px-10 overflow-hidden relative"
     >
-      {/* Giant Windows 8.1 Header */}
-      {isMetro && (
-           <div className="absolute top-[-20px] left-[-20px] pointer-events-none opacity-[0.03] select-none z-0">
-               <h1 className="text-[240px] font-black uppercase tracking-tighter leading-none">YT<br/>DLP</h1>
-               <p className="text-[20px] font-bold tracking-[1em] ml-4 mt-[-40px]">NATIVE INGEST MODE</p>
-           </div>
-       )}
-
       <div className="flex justify-between items-end shrink-0 relative z-10">
         <div className="flex flex-col gap-2">
-          <h1 className={cn("font-black tracking-tighter uppercase leading-[0.7] text-[var(--color-on-surface)] select-none", isMetro ? "text-9xl" : "text-7xl")}>
+          <h1 className="font-black tracking-tighter uppercase leading-[0.7] text-[var(--color-on-surface)] select-none text-7xl">
             yt<br /><span className="text-[var(--color-primary)] opacity-20 italic">dlp</span>
           </h1>
           <span className="text-[10px] font-black uppercase tracking-[0.5em] opacity-40 ml-1">Native Ingest Node</span>
@@ -188,7 +177,7 @@ const YTDLPView: React.FC<Props> = ({ uiMode }) => {
             <motion.div 
                 initial={{ opacity: 0, y: 10 }} 
                 animate={{ opacity: 1, y: 0 }}
-                className={cn("px-6 py-3 border border-[var(--color-primary)] font-black text-[10px] uppercase", isMetro ? "" : "rounded-full")}
+                className="px-6 py-3 border border-[var(--color-primary)] font-black text-[10px] uppercase rounded-[var(--radius-element)]"
             >
                 {statusMessage}
             </motion.div>
@@ -197,13 +186,13 @@ const YTDLPView: React.FC<Props> = ({ uiMode }) => {
 
       <div className="grid grid-cols-12 gap-10 flex-1 min-h-0 relative z-10">
         <div className="col-span-12 lg:col-span-12 xl:col-span-8 flex flex-col gap-6 min-h-0">
-            <div className={cn("p-10 flex flex-col gap-8 flex-1 min-h-0 overflow-y-auto custom-scrollbar border border-[var(--color-outline)]", isMetro ? "bg-black" : "m3-glass-subtle rounded-5xl shadow-xl")}>
+            <div className="p-10 flex flex-col gap-8 flex-1 min-h-0 overflow-y-auto custom-scrollbar border border-[var(--color-outline)] suite-glass-subtle rounded-[var(--radius-container)] shadow-xl">
                 <div className="flex flex-col gap-6">
                 <div className="flex items-center justify-between">
                     <h2 className="text-3xl font-black uppercase tracking-tighter">Request Ingest</h2>
-                    <div className="flex bg-[var(--color-surface)]/40 p-1 rounded-full border border-[var(--color-outline)] gap-1">
+                    <div className="flex bg-[var(--color-surface)]/40 p-1 rounded-[var(--radius-element)] border border-[var(--color-outline)] gap-1">
                             {(['audio', 'video'] as const).map(m => (
-                                <button key={m} onClick={() => setIngestMode(m)} className={cn("px-6 py-2 rounded-full text-[10px] font-black uppercase tracking-widest transition-all", ingestMode === m ? "bg-[var(--color-primary)] text-[var(--color-on-primary)] shadow-lg" : "opacity-30 hover:opacity-100")}>{m}</button>
+                                <button key={m} onClick={() => setIngestMode(m)} className={cn("px-6 py-2 rounded-[var(--radius-element)] text-[10px] font-black uppercase tracking-widest transition-all", ingestMode === m ? "bg-[var(--color-primary)] text-[var(--color-on-primary)] shadow-lg" : "opacity-30 hover:opacity-100")}>{m}</button>
                             ))}
                     </div>
                 </div>
@@ -212,20 +201,17 @@ const YTDLPView: React.FC<Props> = ({ uiMode }) => {
                     value={cloudUrls}
                     onChange={(e) => setCloudUrls(e.target.value)}
                     placeholder="Paste yt-dlp target URLs..."
-                    className="w-full h-40 m3-input resize-none p-8 font-mono text-[11px] leading-relaxed"
+                    className="w-full h-40 suite-input resize-none p-8 font-mono text-[11px] leading-relaxed"
                     />
                     <button 
                         onClick={handleUnpack} 
                         disabled={!cloudUrls || isStaging} 
-                        className={cn(
-                            "absolute bottom-6 right-6 m3-button m3-button-primary shadow-[0_20px_40px_rgba(var(--color-primary-rgb),0.1)]",
-                            isMetro ? "rounded-none shadow-none" : ""
-                        )}
+                        className="absolute bottom-6 right-6 suite-button suite-button-primary shadow-[0_20px_40px_rgba(var(--color-primary-rgb),0.1)]"
                     >
                         {isStaging ? (
                             <Loader2 className="w-4 h-4 animate-spin" />
                         ) : (
-                            <Search className={cn("w-4 h-4", isMetro ? "fill-current" : "")} />
+                            <Search className="w-4 h-4" />
                         )} Fetch Metadata
                     </button>
                 </div>
@@ -238,10 +224,7 @@ const YTDLPView: React.FC<Props> = ({ uiMode }) => {
                             <h3 className="text-[10px] font-black uppercase tracking-[0.4em] opacity-30">Stage Container ({stagedItems.length})</h3>
                             <button 
                                 onClick={commitAllToQueue}
-                                className={cn(
-                                    "px-6 py-2 bg-[var(--color-primary)] text-[var(--color-on-primary)] text-[9px] font-black uppercase tracking-widest transition-all",
-                                    isMetro ? "rounded-none" : "rounded-full shadow-lg hover:scale-105 active:scale-95"
-                                )}
+                                className="px-6 py-2 bg-[var(--color-primary)] text-[var(--color-on-primary)] text-[9px] font-black uppercase tracking-widest transition-all rounded-[var(--radius-element)] shadow-lg hover:scale-105 active:scale-95"
                             >
                                 Queue All ({stagedItems.length})
                             </button>
@@ -254,7 +237,6 @@ const YTDLPView: React.FC<Props> = ({ uiMode }) => {
                                     onRemove={() => setStagedItems(prev => prev.filter(s => s.id !== item.id))}
                                     onCommit={() => commitToQueue(item)}
                                     isProcessing={isProcessing}
-                                    uiMode={uiMode}
                                 />
                             ))}
                         </div>
@@ -265,7 +247,7 @@ const YTDLPView: React.FC<Props> = ({ uiMode }) => {
         </div>
 
         <div className="col-span-12 lg:col-span-12 xl:col-span-4 flex flex-col gap-6 min-h-0">
-            <div className={cn("flex-1 flex flex-col min-h-0 border border-[var(--color-outline)] shadow-2xl overflow-hidden", isMetro ? "bg-black" : "m3-glass-subtle rounded-5xl")}>
+            <div className="flex-1 flex flex-col min-h-0 border border-[var(--color-outline)] shadow-2xl overflow-hidden suite-glass-subtle rounded-[var(--radius-container)]">
                 <div className="p-8 border-b border-[var(--color-outline)] flex items-center gap-3 shrink-0">
                    <Activity className="w-5 h-5 opacity-40" />
                    <h3 className="text-xs font-black uppercase tracking-widest">Master Session Feed</h3>
@@ -303,27 +285,24 @@ const YTDLPView: React.FC<Props> = ({ uiMode }) => {
                             <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Target Vault Node</span>
                             <button 
                                 onClick={handleSelectDirectory}
-                                className={cn("text-[9px] font-black uppercase tracking-widest text-[var(--color-primary)] hover:opacity-100", isMetro ? "opacity-100 underline" : "opacity-40")}
+                                className="text-[9px] font-black uppercase tracking-widest text-[var(--color-primary)] hover:opacity-100 opacity-40"
                             >
                                 Change Path
                             </button>
                         </div>
-                        <div className={cn(
-                            "px-4 py-3 font-mono text-[9px] border border-[var(--color-outline)] truncate",
-                            isMetro ? "bg-black" : "bg-[var(--color-surface)]/40 rounded-2xl"
-                        )} title={targetDirectory}>
+                        <div className="px-4 py-3 font-mono text-[9px] border border-[var(--color-outline)] truncate bg-[var(--color-surface)]/40 rounded-[var(--radius-element)]" title={targetDirectory}>
                             {targetDirectory || 'Fetching Default Path...'}
                         </div>
                     </div>
 
                     <div className="flex items-center justify-between px-2">
                         <span className="text-[10px] font-black uppercase tracking-widest opacity-40">Session Queue</span>
-                        <div className="m3-chip">{queue.length}</div>
+                        <div className="suite-chip">{queue.length}</div>
                     </div>
                     
                     <div className="max-h-48 overflow-y-auto custom-scrollbar flex flex-col gap-3">
                         {queue.map(item => (
-                            <div key={item.id} className={cn("p-4 rounded-3xl border flex items-center gap-4 transition-all duration-500", item.status === 'success' ? "bg-[var(--color-primary)]/5 border-[var(--color-outline)] text-[var(--color-on-surface)]" : item.status === 'processing' ? "bg-[var(--color-primary)] text-[var(--color-on-primary)] shadow-2xl scale-[1.02]" : "bg-[var(--color-surface)]/40 border-[var(--color-outline)] opacity-40")}>
+                            <div key={item.id} className={cn("p-4 rounded-[var(--radius-element)] border flex items-center gap-4 transition-all duration-500", item.status === 'success' ? "bg-[var(--color-primary)]/5 border-[var(--color-outline)] text-[var(--color-on-surface)]" : item.status === 'processing' ? "bg-[var(--color-primary)] text-[var(--color-on-primary)] shadow-2xl scale-[1.02]" : "bg-[var(--color-surface)]/40 border-[var(--color-outline)] opacity-40")}>
                                 <div className="flex-1 min-w-0">
                                     <p className="text-[10px] font-black uppercase truncate tracking-tight">{item.title || item.url}</p>
                                     <p className="text-[8px] font-bold opacity-60 uppercase mt-0.5 tracking-widest">{item.status}</p>
@@ -336,15 +315,12 @@ const YTDLPView: React.FC<Props> = ({ uiMode }) => {
                     <button 
                         onClick={processQueue} 
                         disabled={queue.length === 0 || isProcessing} 
-                        className={cn(
-                            "m3-button m3-button-primary w-full py-5 text-[11px] shadow-[0_20px_50px_rgba(var(--color-primary-rgb),0.1)]",
-                            isMetro ? "rounded-none shadow-none" : ""
-                        )}
+                        className="suite-button suite-button-primary w-full py-5 text-[11px] shadow-[0_20px_50px_rgba(var(--color-primary-rgb),0.1)]"
                     >
                         {isProcessing ? (
                             <Loader2 className="w-5 h-5 animate-spin" />
                         ) : (
-                            <CloudDownload className={cn("w-5 h-5", isMetro ? "fill-current" : "")} />
+                            <CloudDownload className="w-5 h-5" />
                         )} Pull from Cloud
                     </button>
                 </div>

@@ -1,8 +1,8 @@
 import React from 'react';
 import { Play, Pause, SkipForward, SkipBack, ListMusic, Sparkles, Zap, MicOff, X } from 'lucide-react';
 import { motion } from 'framer-motion';
-import Waveform from '../Waveform';
-import StudioVisualizer from '../StudioVisualizer';
+import Waveform from './studio/Waveform';
+import StudioVisualizer from './studio/StudioVisualizer';
 import type { Track } from '../types';
 import type { StudioEffectParams } from '../services/engine/AlgorithmEngine';
 
@@ -18,7 +18,6 @@ interface Props {
   setEffects: (effects: StudioEffectParams) => void;
   onClose?: () => void;
   onExport?: () => void;
-  uiMode: 'material' | 'metro';
 }
 
 const FloatingPlayer: React.FC<Props> = ({ 
@@ -32,11 +31,8 @@ const FloatingPlayer: React.FC<Props> = ({
   effects,
   setEffects,
   onClose,
-  onExport,
-  uiMode
+  onExport
 }) => {
-  const isMetro = uiMode === 'metro';
-  
   const toggleSlowed = () => {
     if (effects.speed === 0.8 && effects.reverbWet === 0.4) {
       setEffects({ ...effects, speed: 1.0, reverbWet: 0 });
@@ -65,7 +61,7 @@ const FloatingPlayer: React.FC<Props> = ({
         initial={{ y: 100, opacity: 0, scale: 0.95 }}
         animate={{ y: 0, opacity: 1, scale: 1 }}
         exit={{ y: 100, opacity: 0, scale: 0.95 }}
-        className="m3-glass-deep rounded-5xl border border-[var(--color-outline)] p-6 flex items-center gap-8 shadow-2xl overflow-hidden relative"
+        className="suite-glass-deep rounded-[var(--radius-container)] border border-[var(--color-outline)] p-6 flex items-center gap-8 shadow-2xl overflow-hidden relative"
       >
         {onClose && (
           <button 
@@ -82,7 +78,7 @@ const FloatingPlayer: React.FC<Props> = ({
 
         {/* Track Info */}
         <div className="flex items-center gap-6 w-[280px] shrink-0 relative z-10">
-          <div className="w-14 h-14 rounded-3xl overflow-hidden shadow-2xl m3-glass-subtle flex-shrink-0 relative group border border-[var(--color-outline)]">
+          <div className="w-14 h-14 rounded-[var(--radius-element)] overflow-hidden shadow-2xl suite-glass-subtle flex-shrink-0 relative group border border-[var(--color-outline)]">
             {track.metadata?.coverArt ? (
               <img src={track.metadata.coverArt} className="w-full h-full object-cover" alt="" />
             ) : (
@@ -103,31 +99,31 @@ const FloatingPlayer: React.FC<Props> = ({
             <div className="flex items-center gap-2 mr-4">
                <button 
                   onClick={toggleSlowed}
-                  className={cn("p-3 rounded-2xl transition-all border", isSlowed ? "bg-[var(--color-primary)] text-[var(--color-on-primary)] border-[var(--color-outline)]" : "bg-[var(--color-primary)]/5 opacity-40 hover:opacity-100 border-[var(--color-outline)]")}
+                  className={cn("p-3 rounded-[var(--radius-element)] transition-all border", isSlowed ? "bg-[var(--color-primary)] text-[var(--color-on-primary)] border-[var(--color-outline)]" : "bg-[var(--color-primary)]/5 opacity-40 hover:opacity-100 border-[var(--color-outline)]")}
                   title="Slowed + Reverb (0.8x)"
                >
                   <Sparkles className="w-4 h-4" />
                </button>
                <button 
                   onClick={toggleNightcore}
-                  className={cn("p-3 rounded-2xl transition-all border", effects.isNightcore ? "bg-[var(--color-primary)] text-[var(--color-on-primary)] border-[var(--color-outline)]" : "bg-[var(--color-primary)]/5 opacity-40 hover:opacity-100 border-[var(--color-outline)]")}
+                  className={cn("p-3 rounded-[var(--radius-element)] transition-all border", effects.isNightcore ? "bg-[var(--color-primary)] text-[var(--color-on-primary)] border-[var(--color-outline)]" : "bg-[var(--color-primary)]/5 opacity-40 hover:opacity-100 border-[var(--color-outline)]")}
                   title="Nightcore (1.2x)"
                >
                   <Zap className="w-4 h-4" />
                </button>
                <button 
                   onClick={toggleVocal}
-                  className={cn("p-3 rounded-2xl transition-all border", effects.isVocalReduced ? "bg-red-600 text-white border-[var(--color-outline)]" : "bg-[var(--color-primary)]/5 opacity-40 hover:opacity-100 border-[var(--color-outline)]")}
+                  className={cn("p-3 rounded-[var(--radius-element)] transition-all border", effects.isVocalReduced ? "bg-red-600 text-white border-[var(--color-outline)]" : "bg-[var(--color-primary)]/5 opacity-40 hover:opacity-100 border-[var(--color-outline)]")}
                   title="Vocal Isolation (AI SLot)"
                >
-                  <MicOff className={cn("w-4 h-4", isMetro ? "fill-current" : "")} />
+                  <MicOff className="w-4 h-4" />
                </button>
             </div>
 
             <button className="p-2 opacity-30 hover:opacity-100 transition-all active:scale-90"><SkipBack className="w-5 h-5" /></button>
             <button 
               onClick={() => setIsPlaying(!isPlaying)}
-              className="w-14 h-14 bg-[var(--color-primary)] text-[var(--color-on-primary)] rounded-[32px] flex items-center justify-center shadow-2xl hover:scale-105 active:scale-95 transition-all duration-300"
+              className="w-14 h-14 bg-[var(--color-primary)] text-[var(--color-on-primary)] rounded-full flex items-center justify-center shadow-2xl hover:scale-105 active:scale-95 transition-all duration-300"
             >
               {isPlaying ? <Pause className="w-6 h-6 fill-current" /> : <Play className="w-6 h-6 fill-current ml-1" />}
             </button>
@@ -153,18 +149,12 @@ const FloatingPlayer: React.FC<Props> = ({
            {onExport ? (
                 <button 
                   onClick={onExport} 
-                  className={cn(
-                    "m3-button m3-button-primary scale-75 origin-right",
-                    isMetro ? "rounded-none" : ""
-                  )}
+                  className="suite-button suite-button-primary scale-75 origin-right"
                 >
                   Render
                 </button>
            ) : (
-                <div className={cn(
-                    "m3-chip bg-[var(--color-primary)] text-[var(--color-on-primary)] border-none",
-                    isMetro ? "rounded-none" : ""
-                )}>
+                <div className="suite-chip bg-[var(--color-primary)] text-[var(--color-on-primary)] border-none">
                   STUDIO
                 </div>
            )}

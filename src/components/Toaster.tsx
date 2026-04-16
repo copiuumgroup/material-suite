@@ -1,5 +1,5 @@
 /**
- * Material 3 Styled Toaster Component
+ * Professional Suite Styled Toaster Component
  */
 
 import React, { useState, createContext, useContext } from 'react';
@@ -70,13 +70,13 @@ function ToastItem({ toast, onClose }: { toast: Toast; onClose: () => void }) {
 
   return (
     <div className={cn(
-      "flex items-center gap-4 px-6 py-4 rounded-3xl m3-glass-deep border border-[var(--color-outline)] shadow-2xl min-w-[300px] max-w-[450px]"
+      "flex items-center gap-4 px-6 py-4 rounded-[var(--radius-element)] suite-glass-deep border border-[var(--color-outline)] shadow-2xl min-w-[300px] max-w-[450px]"
     )}>
       <div className="flex-shrink-0">{icons[toast.type]}</div>
       <p className="flex-1 text-sm font-medium leading-relaxed">{toast.message}</p>
       <button 
         onClick={onClose}
-        className="flex-shrink-0 p-1 hover:bg-[var(--color-outline)] rounded-full transition-colors"
+        className="flex-shrink-0 p-1 hover:bg-[var(--color-outline)] rounded-[var(--radius-element)] transition-colors"
       >
         <X className="w-4 h-4 opacity-50" />
       </button>

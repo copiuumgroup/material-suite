@@ -1,15 +1,12 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { X, Moon, Sun, Zap, Monitor, Folder, Trash2, Settings } from 'lucide-react';
-import { cn } from '../utils';
+import { X, Moon, Sun, Folder, Trash2, Settings } from 'lucide-react';
 
 interface Props {
   isOpen: boolean;
   onClose: () => void;
   theme: 'light' | 'dark';
   setTheme: (theme: 'light' | 'dark') => void;
-  uiMode: 'material' | 'metro';
-  setUiMode: (mode: 'material' | 'metro') => void;
   limiter: {
     threshold: number;
     ratio: number;
@@ -24,13 +21,9 @@ export const SettingsModal: React.FC<Props> = ({
   onClose, 
   theme, 
   setTheme, 
-  uiMode, 
-  setUiMode,
   limiter,
   setLimiter
 }) => {
-  const isMetro = uiMode === 'metro';
-
   const updateLimiter = (key: string, val: number) => {
     setLimiter({ ...limiter, [key]: val });
   };
@@ -38,19 +31,13 @@ export const SettingsModal: React.FC<Props> = ({
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className={cn(
-          "fixed inset-0 z-[100] flex items-center justify-center p-6",
-          isMetro ? "bg-black/20" : "bg-black/40 backdrop-blur-sm"
-        )}>
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-black/40 backdrop-blur-sm">
           <motion.div
-            initial={isMetro ? { x: 350, opacity: 0 } : { scale: 0.9, opacity: 0 }}
+            initial={{ scale: 0.9, opacity: 0 }}
             animate={{ x: 0, opacity: 1, scale: 1 }}
-            exit={isMetro ? { x: 350, opacity: 0 } : { scale: 0.9, opacity: 0 }}
+            exit={{ scale: 0.9, opacity: 0 }}
             transition={{ type: 'spring', damping: 25, stiffness: 300 }}
-            className={cn(
-              "overflow-hidden flex flex-col border border-[var(--color-outline)]",
-              isMetro ? "metro-charm" : "w-full max-w-2xl max-h-[80vh] m3-glass-deep rounded-5xl shadow-2xl"
-            )}
+            className="overflow-hidden flex flex-col border border-[var(--color-outline)] w-full max-w-2xl max-h-[80vh] suite-glass-deep rounded-[var(--radius-container)] shadow-2xl"
           >
             {/* Header */}
             <div className="p-8 border-b border-[var(--color-outline)] flex items-center justify-between">
@@ -60,7 +47,7 @@ export const SettingsModal: React.FC<Props> = ({
               </div>
               <button 
                 onClick={onClose}
-                className="p-2 hover:bg-[var(--color-primary)]/10 rounded-full transition-all"
+                className="p-2 hover:bg-[var(--color-primary)]/10 rounded-[var(--radius-element)] transition-all"
               >
                 <X className="w-6 h-6" />
               </button>
@@ -82,23 +69,10 @@ export const SettingsModal: React.FC<Props> = ({
                   >
                     <button 
                       onClick={() => setTheme(theme === 'light' ? 'dark' : 'light')}
-                      className={cn("flex items-center gap-3 px-6 py-2 border border-[var(--color-outline)] font-bold text-[10px] uppercase transition-all", isMetro ? "rounded-none" : "rounded-full")}
+                      className="flex items-center gap-3 px-6 py-2 border border-[var(--color-outline)] font-bold text-[10px] uppercase transition-all rounded-[var(--radius-element)]"
                     >
                       {theme === 'light' ? <Moon className="w-4 h-4" /> : <Sun className="w-4 h-4" />}
                       {theme.toUpperCase()}
-                    </button>
-                  </SettingItem>
-
-                  <SettingItem 
-                    label="User Interface Mode" 
-                    description="Switch between Material 3 (Fluent/Glass) and Metro (Flat/OLED performance)."
-                  >
-                     <button 
-                      onClick={() => setUiMode(uiMode === 'material' ? 'metro' : 'material')}
-                      className={cn("flex items-center gap-3 px-6 py-2 border border-[var(--color-outline)] font-bold text-[10px] uppercase transition-all", isMetro ? "rounded-none bg-[var(--color-primary)] text-[var(--color-on-primary)]" : "rounded-full")}
-                    >
-                      {uiMode === 'material' ? <Monitor className="w-4 h-4" /> : <Zap className="w-4 h-4 animate-pulse" />}
-                      {uiMode.toUpperCase()}
                     </button>
                   </SettingItem>
                 </div>
@@ -117,7 +91,6 @@ export const SettingsModal: React.FC<Props> = ({
                     min={-20} max={0} step={0.5} 
                     unit="dB"
                     onChange={(v) => updateLimiter('threshold', v)} 
-                    isMetro={isMetro}
                   />
                   <SliderItem 
                     label="Compression Ratio" 
@@ -125,7 +98,6 @@ export const SettingsModal: React.FC<Props> = ({
                     min={1} max={24} step={1} 
                     unit=":1"
                     onChange={(v) => updateLimiter('ratio', v)} 
-                    isMetro={isMetro}
                   />
                   <div className="grid grid-cols-2 gap-8">
                     <SliderItem 
@@ -134,7 +106,6 @@ export const SettingsModal: React.FC<Props> = ({
                         min={0.001} max={0.05} step={0.001} 
                         unit="s"
                         onChange={(v) => updateLimiter('attack', v)} 
-                        isMetro={isMetro}
                     />
                     <SliderItem 
                         label="Release" 
@@ -142,7 +113,6 @@ export const SettingsModal: React.FC<Props> = ({
                         min={0.05} max={0.5} step={0.01} 
                         unit="s"
                         onChange={(v) => updateLimiter('release', v)} 
-                        isMetro={isMetro}
                     />
                   </div>
                 </div>
@@ -158,7 +128,7 @@ export const SettingsModal: React.FC<Props> = ({
                     onClick={async () => {
                         if (window.electronAPI) await window.electronAPI.openAppDataFolder();
                     }}
-                    className={cn("flex-1 p-6 border border-[var(--color-outline)] hover:bg-[var(--color-primary)]/5 transition-all text-left group", isMetro ? "" : "rounded-4xl")}
+                    className="flex-1 p-6 border border-[var(--color-outline)] hover:bg-[var(--color-primary)]/5 transition-all text-left group rounded-[var(--radius-container)]"
                   >
                      <Folder className="w-6 h-6 mb-3 opacity-40 group-hover:opacity-100 transition-all" />
                      <p className="text-xs font-black uppercase">Open AppData</p>
@@ -166,7 +136,7 @@ export const SettingsModal: React.FC<Props> = ({
                   </button>
                   
                   <button 
-                    className={cn("flex-1 p-6 border border-[var(--color-outline)] hover:bg-red-500/10 text-red-500 transition-all text-left group", isMetro ? "" : "rounded-4xl")}
+                    className="flex-1 p-6 border border-[var(--color-outline)] hover:bg-red-500/10 text-red-500 transition-all text-left group rounded-[var(--radius-container)]"
                   >
                      <Trash2 className="w-6 h-6 mb-3 opacity-40 group-hover:opacity-100 transition-all" />
                      <p className="text-xs font-black uppercase">Purge Impulse Vault</p>
@@ -204,7 +174,7 @@ const SettingItem: React.FC<{ label: string; description: string; children: Reac
   </div>
 );
 
-const SliderItem: React.FC<{ label: string; value: number; min: number; max: number; step: number; unit: string; onChange: (v: number) => void; isMetro: boolean }> = ({ label, value, min, max, step, unit, onChange, isMetro }) => (
+const SliderItem: React.FC<{ label: string; value: number; min: number; max: number; step: number; unit: string; onChange: (v: number) => void }> = ({ label, value, min, max, step, unit, onChange }) => (
   <div className="space-y-4">
     <div className="flex justify-between items-end">
         <p className="text-[10px] font-black uppercase tracking-widest opacity-60">{label}</p>
@@ -215,7 +185,7 @@ const SliderItem: React.FC<{ label: string; value: number; min: number; max: num
       min={min} max={max} step={step} 
       value={value} 
       onChange={(e) => onChange(parseFloat(e.target.value))}
-      className={cn("w-full h-1 bg-[var(--color-outline)] appearance-none cursor-pointer outline-none", isMetro ? "accent-[var(--color-primary)]" : "accent-[var(--color-primary)]")}
+      className="w-full h-1 bg-[var(--color-outline)] appearance-none cursor-pointer outline-none accent-[var(--color-primary)]"
     />
   </div>
 );

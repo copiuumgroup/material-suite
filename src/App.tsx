@@ -1,8 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { useAudioEngine } from './useAudioEngine';
-import VaultView from './views/VaultView';
-import StudioView from './views/StudioView';
-import YTDLPView from './views/YTDLPView';
+import React, { useState, useEffect, lazy, Suspense } from 'react';
+import { useAudioEngine } from './hooks/useAudioEngine';
+const VaultView = lazy(() => import('./views/VaultView'));
+const StudioView = lazy(() => import('./views/StudioView'));
+const YTDLPView = lazy(() => import('./views/YTDLPView'));
 import SidebarRail from './components/SidebarRail';
 import { SettingsModal } from './components/SettingsModal';
 import type { ViewType } from './components/SidebarRail';
@@ -10,12 +10,13 @@ import { db, type ProjectMetadata, type ImpulseData } from './db/database';
 import type { Track } from './types';
 import { studioEngine, type StudioEffectParams } from './services/engine/AlgorithmEngine';
 import { AnimatePresence, motion } from 'framer-motion';
-import MatrixBackground from './components/MatrixBackground';
+import MatrixBackground from './components/common/MatrixBackground';
 import FloatingPlayer from './components/FloatingPlayer';
-import { cn, generateId } from './utils';
+import { generateId } from './utils';
 import { getAudioContext, resumeAudioContext } from './services/engine/audioContext';
 import { useToaster } from './components/Toaster';
-import { useExporter } from './useExporter';
+import { useExporter } from './hooks/useExporter';
+import { useDesignSystem } from './hooks/useDesignSystem';
 
 declare global {
   interface Window {
@@ -31,36 +32,23 @@ declare global {
       openAppDataFolder: () => Promise<boolean>;
       checkSystemBinary: () => Promise<{ ytdlp: boolean; ffmpeg: boolean; dotnet: boolean }>;
       purgeArchives: () => Promise<boolean>;
-      getEngineMetrics: () => Promise<{ electron: string; chrome: string; node: string; v8: string }>;
+      getEngineMetrics: () => Promise<{ cpuPercent: number; memoryWorkingSetMB: number; memoryPrivateMB: number }>;
       readFile: (path: string) => Promise<ArrayBuffer | null>;
       cacheAudioFile: (sourcePath: string | null, fileName: string, buffer?: ArrayBuffer) => Promise<string | null>;
       extractAudio: (path: string) => Promise<ArrayBuffer | null>;
       onYtdlpLog: (callback: (data: string) => void) => () => void;
       updateTitleBarOverlay: (settings: { color: string; symbolColor: string; height?: number }) => Promise<boolean>;
+      getSystemAccent: () => Promise<string>;
     };
   }
 }
 
 function App() {
+  useDesignSystem(); // Asset-First OS-Sync
   const [theme, setTheme] = useState<'light' | 'dark'>(() => {
     const saved = localStorage.getItem('studio-theme');
     return (saved as 'light' | 'dark') || 'dark';
   });
-
-  const [uiMode, setUiMode] = useState<'material' | 'metro'>(() => {
-    const saved = localStorage.getItem('ui-mode');
-    return (saved as 'material' | 'metro') || 'material';
-  });
-
-  useEffect(() => {
-    localStorage.setItem('ui-mode', uiMode);
-    // Add or remove metro class on body for global CSS overrides
-    if (uiMode === 'metro') {
-        document.body.classList.add('metro-mode');
-    } else {
-        document.body.classList.remove('metro-mode');
-    }
-  }, [uiMode]);
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [limiterSettings, setLimiterSettings] = useState({
@@ -96,19 +84,35 @@ function App() {
     isVocalReduced: false,
     quality: 'fast',
     isAutoEQEnabled: false,
-    customIRBuffer: null
+    customIRBuffer: null,
+    saturation: 0,
+    reverbRoomSize: 1.0,
+    stereoWidth: 100,
+    tapeWow: 0,
+    tapeFlutter: 0
   });
 
-  // Sync Title Bar to Theme/Mode
+  const [hardwareMetrics, setHardwareMetrics] = useState<{ cpuPercent: number; memoryWorkingSetMB: number; memoryPrivateMB: number } | null>(null);
+
+  // Poll Hardware Telemetry (Local only)
+  useEffect(() => {
+    if (!window.electronAPI) return;
+    const interval = setInterval(async () => {
+        const stats = await window.electronAPI!.getEngineMetrics();
+        setHardwareMetrics(stats);
+    }, 2000);
+    return () => clearInterval(interval);
+  }, []);
+
+  // Sync Title Bar to Theme
   useEffect(() => {
     if (window.electronAPI) {
       window.electronAPI.updateTitleBarOverlay({
-        color: '#00000000',
-        symbolColor: theme === 'dark' ? '#ffffff' : '#000000',
-        height: 38
+        color: theme === 'dark' ? '#000000' : '#ffffff',
+        symbolColor: theme === 'dark' ? '#ffffff' : '#000000'
       });
     }
-  }, [theme, uiMode]);
+  }, [theme]);
 
   // Sync Analysis to Effects
   useEffect(() => {
@@ -306,10 +310,7 @@ function App() {
   };
 
   return (
-    <div className={cn(
-        "w-full h-screen overflow-hidden flex transition-all duration-1000 is-windows bg-[var(--color-surface)]",
-        uiMode === 'metro' ? 'metro-mode' : ''
-    )}>
+    <div className="w-full h-screen overflow-hidden flex transition-all duration-1000 is-windows bg-[var(--color-surface)]">
       <div className="fixed top-0 left-0 w-[calc(100%-144px)] h-[38px] title-bar-drag z-[100]" />
       
       <SidebarRail 
@@ -317,8 +318,6 @@ function App() {
         setView={setCurrentView} 
         theme={theme}
         setTheme={setTheme}
-        uiMode={uiMode}
-        setUiMode={setUiMode}
         onOpenSettings={() => setIsSettingsOpen(true)}
       />
 
@@ -327,34 +326,37 @@ function App() {
         onClose={() => setIsSettingsOpen(false)}
         theme={theme}
         setTheme={setTheme}
-        uiMode={uiMode}
-        setUiMode={setUiMode}
         limiter={limiterSettings}
         setLimiter={setLimiterSettings}
       />
 
       {/* Main Content Area */}
       <main className="flex-1 flex flex-col relative overflow-hidden bg-[var(--color-surface)]">
-        <div className="flex-1 flex flex-col relative z-20 overflow-hidden">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentView}
-              initial={uiMode === 'metro' ? { x: 50, opacity: 0 } : { opacity: 0, scale: 0.98 }}
-              animate={{ x: 0, opacity: 1, scale: 1 }}
-              exit={uiMode === 'metro' ? { x: -50, opacity: 0 } : { opacity: 0, scale: 0.98 }}
-              transition={uiMode === 'metro' ? { duration: 0.15, ease: [0.1, 0.9, 0.2, 1] } : { duration: 0.4, ease: [0.4, 0, 0.2, 1] }}
-              className="flex-1 flex flex-col min-h-0"
-            >
+         <div className="flex-1 overflow-hidden relative z-10">
+         <AnimatePresence mode="wait">
+         <Suspense fallback={
+            <div className="flex-1 flex flex-col items-center justify-center opacity-20">
+                <div className="w-16 h-1 bg-[var(--color-primary)] animate-pulse" />
+                <p className="mt-4 text-[10px] font-black uppercase tracking-[0.5em]">Linking_Chunks...</p>
+            </div>
+         }>
+          <motion.div
+            key={currentView}
+            initial={{ opacity: 0, scale: 0.98 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 1.02 }}
+            transition={{ duration: 0.2, ease: [0.25, 0.1, 0.25, 1] }}
+            className="w-full h-full flex flex-col"
+          >
           {currentView === 'vault' && (
             <VaultView 
               key="vault"
               onUpload={handleFileUpload} 
               onOpenProject={openProject} 
               onDeleteProject={async (id) => await db.projects.delete(id)} 
-              uiMode={uiMode}
             />
           )}
-          {currentView === 'studio' && (
+          {currentView === 'studio' && activeTrack && (
             <StudioView 
               key="studio"
               track={activeTrack}
@@ -375,19 +377,27 @@ function App() {
                   setImpulses(prev => prev.filter(i => i.id !== id));
                   if (effects.irId === id) selectImpulse(null);
               }}
-              uiMode={uiMode}
+              hardwareMetrics={hardwareMetrics}
+              onEject={() => setActiveTrackId(null)}
             />
           )}
           {currentView === 'yt-dlp' && (
-            <YTDLPView key="yt-dlp" uiMode={uiMode} />
+            <YTDLPView key="yt-dlp" />
+          )}
+          {currentView === 'studio' && activeTrack && (
+              <div className="hidden">
+                  {/* Telemetry Debug Slot */}
+                  {JSON.stringify(hardwareMetrics)}
+              </div>
           )}
           </motion.div>
+          </Suspense>
         </AnimatePresence>
         </div>
 
         {/* Backdrop Matrix */}
         <div className="absolute inset-0 z-0 pointer-events-none overflow-hidden pb-16">
-            {uiMode !== 'metro' && <MatrixBackground />}
+            <MatrixBackground />
         </div>
       </main>
 
@@ -407,7 +417,6 @@ function App() {
                setEffects={setEffects}
                onClose={() => setIsPlayerDismissed(true)}
                onExport={handleExport}
-               uiMode={uiMode}
              />
           </motion.div>
         )}

@@ -1,4 +1,4 @@
-import { app, BrowserWindow, protocol, net, ipcMain, session, dialog, shell, type IpcMainInvokeEvent } from 'electron';
+import { app, BrowserWindow, protocol, net, ipcMain, session, dialog, shell, systemPreferences, type IpcMainInvokeEvent } from 'electron';
 import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
@@ -91,12 +91,12 @@ app.whenReady().then(() => {
         ...details.responseHeaders,
         'Content-Security-Policy': [
           "default-src 'self' studio:; " +
-          "script-src 'self' " + (process.env.VITE_DEV_SERVER_URL ? "'unsafe-eval' https://unpkg.com " : "https://unpkg.com ") + "'unsafe-inline' studio: blob:; " +
+          "script-src 'self' " + (process.env.VITE_DEV_SERVER_URL ? "'unsafe-eval' " : "") + "'unsafe-inline' studio: blob:; " +
           "style-src 'self' 'unsafe-inline' studio:; " +
           "font-src 'self' studio:; " +
           "img-src 'self' studio: data: blob:; " +
           "media-src 'self' studio: media: blob: data:; " +
-          "connect-src 'self' studio: https://unpkg.com;"
+          "connect-src 'self' studio:;"
         ]
       }
     });
@@ -138,6 +138,14 @@ app.whenReady().then(() => {
 });
 
 // NATIVE HANDLERS
+ipcMain.handle('get-system-accent', () => {
+  try {
+    return systemPreferences.getAccentColor();
+  } catch (e) {
+    return 'ffffff';
+  }
+});
+
 ipcMain.handle('get-music-path', () => app.getPath('music'));
 
 ipcMain.handle('update-titlebar-overlay', (_event: IpcMainInvokeEvent, settings: any) => {
@@ -146,6 +154,17 @@ ipcMain.handle('update-titlebar-overlay', (_event: IpcMainInvokeEvent, settings:
     return true;
   }
   return false;
+});
+
+ipcMain.handle('get-engine-metrics', async () => {
+  const memory = await process.getProcessMemoryInfo();
+  const cpu = process.getCPUUsage();
+  
+  return {
+    memoryWorkingSetMB: Math.round(memory.residentSet / 1024),
+    memoryPrivateMB: Math.round(memory.private / 1024),
+    cpuPercent: Math.round(cpu.percentCPUUsage)
+  };
 });
 
 ipcMain.handle('extract-audio', async (_event: IpcMainInvokeEvent, filePath: string) => {
@@ -250,8 +269,15 @@ ipcMain.handle('ytdlp-get-info', async (_event: IpcMainInvokeEvent, trackUrl: st
 ipcMain.handle('ytdlp-download', async (event: IpcMainInvokeEvent, trackUrl: string, options: any) => {
   const mode = options?.mode || 'audio';
   const quality = options?.quality || 'mp3';
-  const musicPath = options?.destinationPath || app.getPath('music');
   const win = BrowserWindow.fromWebContents(event.sender);
+  
+  // Security Hardening: Ensure destination path is safe
+  let musicPath = options?.destinationPath || app.getPath('music');
+  if (options?.destinationPath && !isPathSafe(options.destinationPath)) {
+    console.warn('[SECURITY] Blocked unsafe download path:', options.destinationPath);
+    console.warn('[SECURITY] Redirecting to default music path.');
+    musicPath = app.getPath('music');
+  }
 
   return new Promise((resolve) => {
     let args: string[] = [];
@@ -359,13 +385,6 @@ ipcMain.handle('check-system-binary', async () => {
   const dotnet = await check('dotnet', '--list-runtimes');
   return { ytdlp, ffmpeg, dotnet };
 });
-
-ipcMain.handle('get-engine-metrics', () => ({
-  electron: process.versions.electron,
-  chrome: process.versions.chrome,
-  node: process.versions.node,
-  v8: process.versions.v8
-}));
 
 ipcMain.handle('purge-archives', async () => {
   try {

@@ -1,7 +1,7 @@
 {
   "name": "material-audio-tool",
   "private": true,
-  "version": "1.0.0-01A",
+  "version": "0.0.0-dev-dqbai",
   "type": "module",
   "main": "dist-electron/main.js",
   "description": "Material Audio Mastery Studio",
@@ -65,20 +65,22 @@
       "icon": "build/icon.png",
       "target": [
         "portable"
-      ]
+      ],
+      "artifactName": "${productName}-(${version}).${ext}"
     },
     "nsis": {
       "oneClick": false,
       "allowToChangeInstallationDirectory": true,
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
-      "shortcutName": "Material Suite"
+      "shortcutName": "Material Suite",
+      "artifactName": "${productName}-(${version}).${ext}"
     },
     "msi": {
       "oneClick": false,
       "perMachine": true,
       "shortcutName": "Material Studio",
-      "artifactName": "${productName} Setup ${version}.${ext}"
+      "artifactName": "${productName}-(${version}).${ext}"
     }
   }
 }

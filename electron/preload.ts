@@ -24,5 +24,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
     ipcRenderer.on('ytdlp-log', listener);
     return () => ipcRenderer.removeListener('ytdlp-log', listener);
   },
-  updateTitleBarOverlay: (settings: any) => ipcRenderer.invoke('update-titlebar-overlay', settings)
+  updateTitleBarOverlay: (settings: any) => ipcRenderer.invoke('update-titlebar-overlay', settings),
+  getSystemAccent: () => ipcRenderer.invoke('get-system-accent')
 });

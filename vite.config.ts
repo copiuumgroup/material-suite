@@ -33,7 +33,6 @@ export default defineConfig({
                 'child_process'
               ],
               onwarn(warning, warn) {
-                // Suppress specific noise that we can't control from internal plugins
                 if (warning.code === 'INVALID_OPTION' && warning.message.includes('"freeze"')) return;
                 if (warning.message.includes('customResolver')) return;
                 warn(warning);
@@ -51,6 +50,26 @@ export default defineConfig({
     ]),
     renderer(),
   ],
+  build: {
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules')) {
+            if (id.includes('framer-motion') || id.includes('lucide-react')) {
+              return 'vendor-ui';
+            }
+            if (id.includes('react')) {
+              return 'vendor-react';
+            }
+            if (id.includes('dexie')) {
+              return 'vendor-db';
+            }
+            return 'vendor'; // all other deps
+          }
+        }
+      }
+    }
+  },
   server: {
     headers: {
       "Cross-Origin-Opener-Policy": "same-origin",

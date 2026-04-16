@@ -44,10 +44,28 @@ class MaterialStudioAPI {
   }
 
   // --- ENGINE API ---
+  /**
+   * Performs real-time spectral analysis for volume monitoring.
+   * Calculates RMS (Root Mean Square) for perceptual loudness estimation.
+   */
   public async getSpectralDNA(buffer: AudioBuffer) {
     this.emitStudioLog(`Analyzing Spectral DNA for ${buffer.length} samples...`);
-    // Placeholder for future AI integration
-    return { status: 'ready' };
+    
+    const data = buffer.getChannelData(0);
+    let sum = 0;
+    for (let i = 0; i < data.length; i++) {
+        sum += data[i] * data[i];
+    }
+    const rms = Math.sqrt(sum / data.length);
+    const db = 20 * Math.log10(rms);
+    
+    this.emitStudioLog(`Analysis Complete. RMS: ${db.toFixed(2)}dBFS`);
+
+    return { 
+        rms, 
+        db,
+        status: 'ready' 
+    };
   }
 }
 

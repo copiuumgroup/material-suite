@@ -15,8 +15,12 @@
   
   --color-outline: rgba(255, 255, 255, 0.1);
   
-  --radius-4xl: 32px;
-  --radius-5xl: 48px;
+  /* Hierarchy: 16px Container / 8px Elements */
+  --radius-container: 16px;
+  --radius-element: 8px;
+  
+  --radius-4xl: var(--radius-container);
+  --radius-5xl: var(--radius-container);
 }
 
 /* Light Theme Overrides */
@@ -42,30 +46,55 @@
 
   body {
     @apply bg-[var(--color-surface)] text-[var(--color-on-surface)] antialiased overflow-hidden;
-    font-family: 'Segoe UI Semilight', 'Segoe UI', 'Outfit', system-ui, sans-serif;
+    font-family: 'Segoe UI Variable Display', 'Segoe UI', 'Outfit', system-ui, sans-serif;
   }
 }
 
 @layer components {
-  .m3-card {
-    @apply bg-[var(--color-surface-variant)] rounded-4xl border border-[var(--color-outline)] transition-all duration-300;
+  .suite-card {
+    @apply bg-[var(--color-surface-variant)] rounded-[var(--radius-container)] border border-[var(--color-outline)] transition-all duration-300;
   }
 
-  .m3-button {
-    @apply px-6 py-3 rounded-full font-black uppercase tracking-widest text-[10px] transition-all duration-300 active:scale-95 disabled:opacity-20 flex items-center justify-center gap-2;
+  .suite-button {
+    @apply px-6 py-2.5 rounded-[var(--radius-element)] font-black uppercase tracking-widest text-[10px] transition-all duration-150 active:scale-95 disabled:opacity-20 flex items-center justify-center gap-2;
   }
 
-  .m3-button-primary {
+  .suite-button-primary {
     @apply bg-[var(--color-primary)] text-[var(--color-on-primary)] hover:opacity-90;
   }
 
-  .m3-button-outline {
+  .suite-button-outline {
     @apply border border-[var(--color-outline)] hover:bg-[var(--color-on-surface)] hover:text-[var(--color-surface)];
   }
 
-  .m3-input {
-    @apply bg-[var(--color-surface-variant)] border border-[var(--color-outline)] rounded-2xl px-6 py-4 text-sm focus:outline-none focus:border-[var(--color-primary)]/40 transition-all placeholder:opacity-30;
+  .suite-input {
+    @apply bg-[var(--color-surface-variant)] border border-[var(--color-outline)] rounded-[var(--radius-element)] px-6 py-4 text-sm focus:outline-none focus:border-[var(--color-primary)]/40 transition-all placeholder:opacity-30;
   }
+
+  .suite-input:focus {
+    @apply border-[var(--color-primary)]/40;
+  }
+
+  .suite-chip {
+    @apply px-4 py-1.5 rounded-[var(--radius-element)] bg-[var(--color-outline)] text-[10px] font-bold uppercase tracking-wider;
+  }
+
+  /* Professional Glassmorphism */
+  .suite-glass-subtle {
+    @apply backdrop-blur-md bg-[rgba(var(--color-surface-rgb),0.3)];
+    will-change: backdrop-filter;
+  }
+
+  .suite-glass-deep {
+    @apply backdrop-blur-3xl bg-[rgba(var(--color-surface-rgb),0.7)];
+    will-change: backdrop-filter;
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+  }
+}
+
+/* Standardized Transitions */
+.transition-studio {
+  transition: all 150ms cubic-bezier(0.1, 0.9, 0.2, 1);
 }
 
 /* Scrollbar Refinement */
@@ -93,20 +122,6 @@
   animation: float 6s ease-in-out infinite;
 }
 
-/* Material Design 3 Glass System */
-.m3-glass-subtle {
-  @apply backdrop-blur-md bg-[rgba(var(--color-surface-rgb),0.3)];
-  will-change: backdrop-filter, transform;
-  transform: translateZ(0);
-}
-
-.m3-glass-deep {
-  @apply backdrop-blur-3xl bg-[rgba(var(--color-surface-rgb),0.7)];
-  will-change: backdrop-filter, transform;
-  transform: translateZ(0);
-  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
-}
-
 .title-bar-drag {
   -webkit-app-region: drag;
   pointer-events: auto !important;
@@ -116,54 +131,7 @@
   -webkit-app-region: no-drag;
 }
 
-.m3-chip {
-  @apply px-4 py-1.5 rounded-full bg-[var(--color-outline)] text-[10px] font-bold uppercase tracking-wider;
-}
-
 .vertical-text {
   writing-mode: vertical-rl;
   text-orientation: mixed;
-}
-
-/* --- METRO UI MODE (Windows 8.1 Performance) --- */
-.metro-mode {
-  --radius-4xl: 0px !important;
-  --radius-5xl: 0px !important;
-  --radius-full: 0px !important;
-}
-
-.metro-mode * {
-  border-radius: 0px !important;
-  box-shadow: none !important;
-  backdrop-filter: none !important;
-}
-
-.metro-mode .m3-glass-subtle,
-.metro-mode .m3-glass-deep {
-  background: var(--color-surface) !important;
-  backdrop-filter: none !important;
-}
-
-.metro-mode .metro-charm {
-  @apply fixed top-0 right-0 h-full w-[350px] bg-[var(--color-surface)] border-l border-[var(--color-outline)] shadow-none z-[110];
-}
-
-.metro-mode .m3-button {
-  @apply rounded-none;
-}
-
-.metro-mode .m3-chip {
-  @apply rounded-none bg-[var(--color-outline)] border border-[var(--color-primary)]/20;
-}
-
-/* Disable all smooth transitions for maximum snappiness in Metro mode */
-.metro-mode .transition-all,
-.metro-mode .transition-opacity,
-.metro-mode .transition-transform {
-  transition-duration: 150ms !important;
-  transition-timing-function: cubic-bezier(0.1, 0.9, 0.2, 1) !important;
-}
-
-.metro-mode .animate-float {
-  animation: none !important;
 }
