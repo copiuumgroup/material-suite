@@ -29,6 +29,8 @@ export interface StudioEffectParams {
     attack: number;
     release: number;
   };
+  vocalPitch: number;
+  vocalTone: number;
 }
 
 class AlgorithmEngine {

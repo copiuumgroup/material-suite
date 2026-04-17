@@ -11,6 +11,7 @@ interface Props {
   defaultValue?: number;
   onChange: (val: number) => void;
   suffix?: string;
+  disabled?: boolean;
 }
 
 export const AudioKnob: React.FC<Props> = ({
@@ -21,7 +22,8 @@ export const AudioKnob: React.FC<Props> = ({
   step = 1,
   defaultValue,
   onChange,
-  suffix = '%'
+  suffix = '%',
+  disabled = false
 }) => {
   const knobRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -29,6 +31,7 @@ export const AudioKnob: React.FC<Props> = ({
   const rotation = ((value - min) / (max - min)) * 270 - 135;
 
   const handlePointerDown = (e: React.PointerEvent) => {
+    if (disabled) return;
     e.preventDefault();
     setIsDragging(true);
     knobRef.current?.setPointerCapture(e.pointerId);
@@ -65,7 +68,10 @@ export const AudioKnob: React.FC<Props> = ({
         onPointerMove={handlePointerMove}
         onPointerUp={handlePointerUp}
         onDoubleClick={handleDoubleClick}
-        className="relative w-14 h-14 cursor-ns-resize flex items-center justify-center transition-all duration-300 suite-glass-subtle rounded-full shadow-lg"
+        className={cn(
+          "relative w-14 h-14 cursor-ns-resize flex items-center justify-center transition-all duration-300 suite-glass-subtle rounded-full shadow-lg",
+          disabled && "opacity-20 grayscale pointer-events-none"
+        )}
       >
         <svg className="w-12 h-12 transform rotate-[135deg]">
               <circle 

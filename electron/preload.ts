@@ -25,5 +25,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
     return () => ipcRenderer.removeListener('ytdlp-log', listener);
   },
   updateTitleBarOverlay: (settings: any) => ipcRenderer.invoke('update-titlebar-overlay', settings),
-  getSystemAccent: () => ipcRenderer.invoke('get-system-accent')
+  getSystemAccent: () => ipcRenderer.invoke('get-system-accent'),
+  getTempPath: () => ipcRenderer.invoke('get-temp-path'),
+  studioEngine: {
+    command: (cmd: any) => ipcRenderer.invoke('engine:command', cmd),
+    onLog: (callback: (data: string) => void) => {
+      const listener = (_event: any, data: string) => callback(data);
+      ipcRenderer.on('engine-log', listener);
+      return () => ipcRenderer.removeListener('engine-log', listener);
+    }
+  }
 });

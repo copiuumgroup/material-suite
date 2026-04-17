@@ -8,7 +8,7 @@ class AudioContextManager {
   public static getInstance(): AudioContext {
     if (!this.instance) {
       this.instance = new (window.AudioContext || (window as any).webkitAudioContext)({
-        latencyHint: 'interactive',
+        latencyHint: 'playback', // Stable buffer for standard Windows drivers
         sampleRate: 44100, // Standardize sample rate
       });
     }

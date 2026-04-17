@@ -9,13 +9,76 @@ import os from 'os';
 const activeProcesses = new Map<string, any>();
 const MAX_BUFFER_SIZE = 512 * 1024 * 1024; // 512MB Limit
 let mainWindow: BrowserWindow | null = null;
+let engineProcess: any = null;
+const engineCallbacks = new Map<string, (data: any) => void>();
+
+class StudioEngineManager {
+  static spawn() {
+    if (engineProcess) return;
+
+    const pythonPath = 'python'; // User confirmed they have python installed
+    const scriptPath = path.join(app.getAppPath(), 'python', 'studio_engine.py');
+
+    console.log('[ENGINE] Spawning Studio Engine...');
+    engineProcess = spawn(pythonPath, ['-u', scriptPath]);
+
+    engineProcess.stdout.on('data', (data: Buffer) => {
+      data.toString().split('\n').forEach(line => {
+        if (!line.trim()) return;
+        try {
+          const msg = jsonSafeParse(line);
+          if (msg.type === 'log') {
+            console.log(`[PYTHON] ${msg.message}`);
+            mainWindow?.webContents.send('engine-log', msg.message);
+          } else if (msg.type === 'response') {
+            const callback = engineCallbacks.get(msg.id);
+            if (callback) {
+              callback(msg.data);
+              engineCallbacks.delete(msg.id);
+            }
+          }
+        } catch (e) {
+          console.error('[ENGINE] Pipe Error:', line);
+        }
+      });
+    });
+
+    engineProcess.stderr.on('data', (data: Buffer) => {
+      console.error(`[PYTHON-ERR] ${data.toString()}`);
+    });
+
+    engineProcess.on('close', () => {
+      console.log('[ENGINE] Studio Engine Exited.');
+      engineProcess = null;
+    });
+  }
+
+  static sendCommand(command: any): Promise<any> {
+    return new Promise((resolve) => {
+      if (!engineProcess) {
+        resolve({ success: false, error: 'Engine not running' });
+        return;
+      }
+      const id = Math.random().toString(36).substring(7);
+      engineCallbacks.set(id, resolve);
+      engineProcess.stdin.write(JSON.stringify({ ...command, id }) + '\n');
+    });
+  }
+}
+
+function jsonSafeParse(str: string) {
+  try { return JSON.parse(str); } catch (e) { return {}; }
+}
 
 function isPathSafe(filePath: string) {
   try {
     const musicPath = path.resolve(app.getPath('music'));
     const userDataPath = path.resolve(app.getPath('userData'));
+    const tempPath = path.resolve(os.tmpdir());
     const resolvedPath = path.resolve(filePath);
-    return resolvedPath.startsWith(musicPath) || resolvedPath.startsWith(userDataPath);
+    return resolvedPath.startsWith(musicPath)
+        || resolvedPath.startsWith(userDataPath)
+        || resolvedPath.startsWith(tempPath);
   } catch (e) { return false; }
 }
 
@@ -135,6 +198,7 @@ app.whenReady().then(() => {
   });
 
   createWindow();
+  StudioEngineManager.spawn();
 });
 
 // NATIVE HANDLERS
@@ -478,6 +542,12 @@ ipcMain.handle('save-file', async (event: IpcMainInvokeEvent, fileName: string, 
     return null;
   }
 });
+
+ipcMain.handle('engine:command', async (_event: IpcMainInvokeEvent, command: any) => {
+  return await StudioEngineManager.sendCommand(command);
+});
+
+ipcMain.handle('get-temp-path', () => app.getPath('temp'));
 
 app.on('window-all-closed', () => { app.quit(); });
 

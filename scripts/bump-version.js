@@ -29,14 +29,22 @@ function bump() {
     const pkgPath = path.resolve(__dirname, '../package.json');
     const pkg = JSON.parse(fs.readFileSync(pkgPath, 'utf-8'));
     
-    // Use a SemVer-compliant format for electron-builder (0.0.0-dev.xxxxx)
-    // The UI will still use buildId (dev-xxxxx) from build-metadata.json
-    pkg.version = `0.0.0-${metadata.buildId}`;
+    // 💎 Hybrid Versioning Restoration 💎
+    // Satisfy electron-builder SemVer requirement with static 0.0.0
+    pkg.version = '0.0.0';
+    
+    // Inject custom dev-xxxxx ID directly into naming templates
+    const artifactName = `Material Suite-${metadata.buildId}.\${ext}`;
+    if (pkg.build) {
+        if (pkg.build.win) pkg.build.win.artifactName = artifactName;
+        if (pkg.build.nsis) pkg.build.nsis.artifactName = artifactName;
+        if (pkg.build.msi) pkg.build.msi.artifactName = artifactName;
+    }
     
     fs.writeFileSync(pkgPath, JSON.stringify(pkg, null, 2));
     
     console.log(`\n[VERSION] Build ID generated: ${metadata.buildId}`);
-    console.log(`[PACKAGE] package.json version synced to: ${pkg.version}\n`);
+    console.log(`[PACKAGE] Build metadata synced and artifact naming updated.\n`);
   } catch (err) {
     console.error('[ERROR] Failed to bump build version:', err);
     process.exit(1);

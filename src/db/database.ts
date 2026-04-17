@@ -39,6 +39,10 @@ export interface ProjectMetadata {
   sourceUrl?: string;
   archivedAt?: number;
   mediaType?: 'audio' | 'video';
+  stems?: {
+    vocals: string | null;
+    instrumental: string | null;
+  };
 }
 
 export class StudioDatabase extends Dexie {

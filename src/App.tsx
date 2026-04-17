@@ -9,7 +9,7 @@ import { RenderModal, type RenderConfig } from './components/studio/RenderModal'
 import type { ViewType } from './components/SidebarRail';
 import { db, type ProjectMetadata, type ImpulseData } from './db/database';
 import type { Track } from './types';
-import { studioEngine, type StudioEffectParams } from './services/engine/AlgorithmEngine';
+import { studioEngine, type StudioEffects } from './services/engine/StudioEngine';
 import { AnimatePresence, motion } from 'framer-motion';
 import MatrixBackground from './components/common/MatrixBackground';
 import FloatingPlayer from './components/FloatingPlayer';
@@ -40,6 +40,11 @@ declare global {
       onYtdlpLog: (callback: (data: string) => void) => () => void;
       updateTitleBarOverlay: (settings: { color: string; symbolColor: string; height?: number }) => Promise<boolean>;
       getSystemAccent: () => Promise<string>;
+      getTempPath: () => Promise<string>;
+      studioEngine: {
+        command: (cmd: any) => Promise<any>;
+        onLog: (callback: (data: string) => void) => () => void;
+      };
     };
   }
 }
@@ -54,10 +59,10 @@ function App() {
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   const [isRenderModalOpen, setIsRenderModalOpen] = useState(false);
   const [limiterSettings, setLimiterSettings] = useState({
-    threshold: -3.0,
-    ratio: 12,
-    attack: 0.003,
-    release: 0.25
+    threshold: -0.5,  // Only catches true digital overs — not a compressor
+    ratio: 20,        // 20:1 = true limiting behaviour
+    attack: 0.001,    // 1ms fast attack
+    release: 0.1      // 100ms release
   });
 
   // Sync Limiter Settings to Effects
@@ -79,19 +84,34 @@ function App() {
 
   const activeTrack = tracks.find((t: Track) => t.id === activeTrackId) || null;
 
-  const [effects, setEffects] = useState<StudioEffectParams>({
+  const [effects, setEffects] = useState<StudioEffects>({
     speed: 1.0,
     reverbWet: 0,
-    isNightcore: false,
-    isVocalReduced: false,
-    isMultibandEnabled: false,
-    isAutoEQEnabled: false,
-    customIRBuffer: null,
     saturation: 0,
-    reverbRoomSize: 1.0,
     stereoWidth: 100,
     tapeWow: 0,
-    tapeFlutter: 0
+    tapeFlutter: 0,
+    vocalPitch: 0,
+    vocalTone: 0,
+    isAutoEQEnabled: false,
+    isMultibandEnabled: false,
+    isVocalFocusEnabled: false,
+    isNightcore: false,
+    isVocalReduced: false,
+    isSpatialEnabled: false,
+    spatialVocal: { x: 0, y: 0, z: 0 },
+    spatialInstrumental: { x: 0, y: 0, z: 0 },
+    isGPUAccelerated: false,
+    gpuGains: { low: 1.0, mid: 1.0, high: 1.0 },
+    limiter: {
+      threshold: -1.0,
+      ratio: 12,
+      attack: 0.003,
+      release: 0.25
+    },
+    irId: undefined,
+    reverbRoomSize: 1.0,
+    customIRBuffer: null,
   });
 
   const [hardwareMetrics, setHardwareMetrics] = useState<{ cpuPercent: number; memoryWorkingSetMB: number; memoryPrivateMB: number } | null>(null);
@@ -134,6 +154,33 @@ function App() {
     loadImpulses();
   }, []);
 
+  const [stemBuffers, setStemBuffers] = useState<{ vocals: AudioBuffer | null, instrumental: AudioBuffer | null }>({ vocals: null, instrumental: null });
+
+  useEffect(() => {
+    const loadStems = async () => {
+        if (!activeTrack?.stems || !window.electronAPI) {
+            setStemBuffers({ vocals: null, instrumental: null });
+            return;
+        }
+        const ctx = getAudioContext();
+        try {
+            const results: { vocals: AudioBuffer | null, instrumental: AudioBuffer | null } = { vocals: null, instrumental: null };
+            if (activeTrack.stems.vocals) {
+                const vocalData = await window.electronAPI.readFile(activeTrack.stems.vocals);
+                if (vocalData) results.vocals = await ctx.decodeAudioData(vocalData);
+            }
+            if (activeTrack.stems.instrumental) {
+                const instData = await window.electronAPI.readFile(activeTrack.stems.instrumental);
+                if (instData) results.instrumental = await ctx.decodeAudioData(instData);
+            }
+            setStemBuffers(results);
+        } catch (e) {
+            console.error('[ENGINE] Stem Decode Failure:', e);
+        }
+    };
+    loadStems();
+  }, [activeTrackId, activeTrack?.stems]);
+
   const { toast } = useToaster();
 
   const {
@@ -143,7 +190,7 @@ function App() {
     duration,
     seekTo,
     analyser
-  } = useAudioEngine(activeTrack?.buffer || null, effects);
+  } = useAudioEngine(activeTrack?.buffer || null, effects, stemBuffers);
 
   const audioCtx = getAudioContext();
 
@@ -298,15 +345,14 @@ function App() {
     try {
       // Phase 1: Smart Filename Generation
       const tags: string[] = [];
-      if (effects.speed === 0.8 && effects.reverbWet === 0.4 && !effects.isNightcore) {
+      if (effects.speed === 0.8 && effects.reverbWet === 0.4) {
         tags.push("Slowed + Reverb");
-      } else if (effects.isNightcore) {
-        tags.push("Nightcore");
       } else if (effects.speed !== 1.0) {
         tags.push(`${Math.round(effects.speed * 100)}% Speed`);
       }
-      if (effects.isVocalReduced) tags.push("Vocal Reduced");
-      if (effects.saturation > 10) tags.push("Distorted");
+      if (effects.isVocalFocusEnabled) tags.push("Surgical Vocal Focus");
+      if (effects.isMultibandEnabled) tags.push("Reference Multiband");
+      if (effects.saturation > 10) tags.push("Material Saturation");
 
       const tagString = tags.length > 0 ? ` (${tags.join(', ')})` : '';
       const baseName = activeTrack.file.name.replace(/\.[^/.]+$/, "");
@@ -416,6 +462,7 @@ function App() {
               }}
               hardwareMetrics={hardwareMetrics}
               onEject={() => setActiveTrackId(null)}
+              setTracks={setTracks}
             />
           )}
           {currentView === 'yt-dlp' && (

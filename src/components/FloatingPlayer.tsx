@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import Waveform from './studio/Waveform';
 import StudioVisualizer from './studio/StudioVisualizer';
 import type { Track } from '../types';
-import type { StudioEffectParams } from '../services/engine/AlgorithmEngine';
+import type { StudioEffects } from '../services/engine/StudioEngine';
 
 interface Props {
   track: Track;
@@ -14,8 +14,8 @@ interface Props {
   duration: number;
   seekTo: (time: number) => void;
   analyser: AnalyserNode | null;
-  effects: StudioEffectParams;
-  setEffects: (effects: StudioEffectParams) => void;
+  effects: StudioEffects;
+  setEffects: (effects: StudioEffects) => void;
   onClose?: () => void;
   onExport?: () => void;
 }

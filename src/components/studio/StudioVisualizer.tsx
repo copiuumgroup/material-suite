@@ -26,7 +26,7 @@ const StudioVisualizer: React.FC<Props> = ({ analyser }) => {
 
       ctx.clearRect(0, 0, width, height);
 
-      const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#fff';
+      const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--color-on-surface').trim() || '#fff';
       const barCount = 48;
       const totalPad = 4;
       const barWidth = (width - (barCount * totalPad)) / barCount;

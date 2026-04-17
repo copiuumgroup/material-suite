@@ -12,8 +12,8 @@ const Waveform: React.FC<WaveformProps> = ({ buffer, currentTime, duration, onSe
 
   const peaks = useMemo(() => {
     if (!buffer) return [];
-    const rawData = buffer.getChannelData(0); 
-    const samples = 300; 
+    const rawData = buffer.getChannelData(0);
+    const samples = 300;
     const blockSize = Math.floor(rawData.length / samples);
     const result = [];
 
@@ -23,7 +23,7 @@ const Waveform: React.FC<WaveformProps> = ({ buffer, currentTime, duration, onSe
         const val = Math.abs(rawData[i * blockSize + j]);
         if (val > max) max = val;
       }
-      result.push(Math.pow(max, 0.7)); 
+      result.push(Math.pow(max, 0.7));
     }
     return result;
   }, [buffer]);
@@ -50,22 +50,29 @@ const Waveform: React.FC<WaveformProps> = ({ buffer, currentTime, duration, onSe
     const barGap = (width / peaks.length) * 0.4;
     const centerY = height / 2;
 
-    const primaryColor = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim() || '#fff';
-    const outlineColor = getComputedStyle(document.documentElement).getPropertyValue('--outline').trim() || 'rgba(255,255,255,0.1)';
+    // Use correct CSS variable names from the design system
+    const style = getComputedStyle(document.documentElement);
+    const primaryColor = style.getPropertyValue('--color-on-surface').trim() || '#e8e8e8';
+    const outlineColor = style.getPropertyValue('--color-outline').trim() || 'rgba(255,255,255,0.13)';
+
+    // Progress ratio — clamp between 0 and 1, and reset cleanly when song ends
+    const progress = duration > 0 ? Math.min(1, Math.max(0, currentTime / duration)) : 0;
 
     peaks.forEach((peak, i) => {
       const x = i * (barWidth + barGap);
       const barHeight = Math.max(2, peak * height * 0.8);
-      const isPlayed = (i / peaks.length) < (currentTime / duration);
+      const isPlayed = (i / peaks.length) < progress;
       
       ctx.fillStyle = isPlayed ? primaryColor : outlineColor;
-      ctx.globalAlpha = isPlayed ? 1 : 0.3;
+      ctx.globalAlpha = isPlayed ? 0.9 : 0.35;
       
       const r = barWidth / 2;
       ctx.beginPath();
       ctx.roundRect(x, centerY - barHeight / 2, barWidth, barHeight, r);
       ctx.fill();
     });
+
+    ctx.globalAlpha = 1;
   };
 
   useEffect(() => {

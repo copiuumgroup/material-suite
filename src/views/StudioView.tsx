@@ -1,12 +1,16 @@
 import React from 'react';
 import { motion } from 'framer-motion';
-import { Play, Pause, SkipForward, SkipBack, Music, Sparkles, Zap, MicOff, Folder, Share, X } from 'lucide-react';
+import { Play, Pause, SkipForward, SkipBack, Music, Sparkles, Zap, Folder, Share, X, Loader2, Music2 } from 'lucide-react';
 import Waveform from '../components/studio/Waveform';
 import StudioVisualizer from '../components/studio/StudioVisualizer';
 import type { Track } from '../types';
-import type { StudioEffectParams } from '../services/engine/AlgorithmEngine';
+import type { StudioEffects } from '../services/engine/StudioEngine';
 import { AudioKnob } from '../components/common/AudioKnob';
 import { cn } from '../utils';
+import { useState } from 'react';
+import { StemEngine } from '../services/engine/StemEngine';
+import { db } from '../db/database';
+import { useToaster } from '../components/Toaster';
 
 import type { ImpulseData } from '../db/database';
 
@@ -18,8 +22,8 @@ interface Props {
   duration: number;
   seekTo: (time: number) => void;
   analyser: AnalyserNode | null;
-  effects: StudioEffectParams;
-  setEffects: (effects: StudioEffectParams) => void;
+  effects: StudioEffects;
+  setEffects: (effects: StudioEffects) => void;
   onExport: () => void;
   impulses: ImpulseData[];
   onIRUpload: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -27,6 +31,7 @@ interface Props {
   onIRDelete: (id: number) => void;
   hardwareMetrics: { cpuPercent: number; memoryWorkingSetMB: number; memoryPrivateMB: number } | null;
   onEject: () => void;
+  setTracks: React.Dispatch<React.SetStateAction<Track[]>>;
 }
 
 const StudioView: React.FC<Props> = ({ 
@@ -45,8 +50,29 @@ const StudioView: React.FC<Props> = ({
   onIRSelect,
   onIRDelete,
   hardwareMetrics,
-  onEject
+  onEject,
+  setTracks
 }) => {
+  const [isDemixing, setIsDemixing] = useState(false);
+  const { toast } = useToaster();
+
+  const handleDemix = async () => {
+    if (!track?.internalPath || isDemixing) return;
+    setIsDemixing(true);
+    toast("Starting GPU AI Demixing...", "info");
+    try {
+        const stems = await StemEngine.separateStems(track.internalPath);
+        if (stems) {
+            setTracks(prev => prev.map(t => t.id === track.id ? { ...t, stems } : t));
+            await db.projects.update(Number(track.id), { stems });
+            toast("Vocal Isolation Successful!", "success");
+        }
+    } catch (e: any) {
+        toast(`Stem Engine Error: ${e.message}`, "error");
+    } finally {
+        setIsDemixing(false);
+    }
+  };
   const toggleSlowed = () => {
     if (effects.speed === 0.8 && effects.reverbWet === 0.4) {
       setEffects({ ...effects, speed: 1.0, reverbWet: 0 });
@@ -59,12 +85,12 @@ const StudioView: React.FC<Props> = ({
     if (effects.isNightcore) {
       setEffects({ ...effects, speed: 1.0, isNightcore: false });
     } else {
-      setEffects({ ...effects, speed: 1.2, isNightcore: true, reverbWet: 0 });
+      setEffects({ ...effects, speed: 1.25, reverbWet: 0, isNightcore: true });
     }
   };
 
-  const toggleVocal = () => {
-    setEffects({ ...effects, isVocalReduced: !effects.isVocalReduced });
+  const toggleVocalFocus = () => {
+    setEffects({ ...effects, isVocalFocusEnabled: !effects.isVocalFocusEnabled });
   };
 
   const isSlowed = effects.speed === 0.8 && effects.reverbWet === 0.4;
@@ -155,40 +181,34 @@ const StudioView: React.FC<Props> = ({
                       <button className="p-4 opacity-30 hover:opacity-100 transition-all active:scale-95"><SkipForward className="w-6 h-6" /></button>
                   </div>
 
-                  <div className="flex items-center gap-4 p-2 border border-[var(--color-outline)] suite-glass-subtle rounded-[var(--radius-container)] shadow-inner">
+                  <div className="flex items-center gap-3 p-2 border border-[var(--color-outline)] suite-glass-subtle rounded-[var(--radius-container)] shadow-inner flex-wrap">
                       <button 
                          onClick={toggleSlowed}
-                         className={cn("px-6 py-3 flex items-center gap-2 text-[9px] font-black uppercase tracking-widest transition-all rounded-[var(--radius-element)]", isSlowed ? "bg-[var(--color-primary)] text-[var(--color-on-primary)]" : "opacity-30 hover:opacity-100")}
+                         className={cn("px-5 py-2.5 flex items-center gap-2 text-[9px] font-black uppercase tracking-widest transition-all rounded-[var(--radius-element)]", isSlowed ? "bg-[var(--color-primary)] text-[var(--color-on-primary)]" : "opacity-30 hover:opacity-100")}
                       >
                          <Sparkles className="w-3.5 h-3.5" /> Slow + Reverb
                       </button>
                       <button 
                          onClick={toggleNightcore}
-                         className={cn("px-6 py-3 flex items-center gap-2 text-[9px] font-black uppercase tracking-widest transition-all rounded-[var(--radius-element)]", effects.isNightcore ? "bg-[var(--color-primary)] text-[var(--color-on-primary)]" : "opacity-30 hover:opacity-100")}
+                         className={cn("px-5 py-2.5 flex items-center gap-2 text-[9px] font-black uppercase tracking-widest transition-all rounded-[var(--radius-element)]", effects.isNightcore ? "bg-rose-500 text-white shadow-[0_0_14px_rgba(244,63,94,0.45)]" : "opacity-30 hover:opacity-100")}
                       >
                          <Zap className="w-3.5 h-3.5" /> Nightcore
                       </button>
-                      <div className="w-px h-6 bg-[var(--color-outline)] mx-1" />
+                      <div className="w-px h-5 bg-[var(--color-outline)] mx-0.5" />
                       <button 
-                         onClick={toggleVocal}
-                         className={cn("px-6 py-3 flex items-center gap-2 text-[9px] font-black uppercase tracking-widest transition-all rounded-[var(--radius-element)]", effects.isVocalReduced ? "bg-red-600 text-white" : "opacity-30 hover:opacity-100")}
+                         onClick={toggleVocalFocus}
+                         className={cn("px-5 py-2.5 flex items-center gap-2 text-[9px] font-black uppercase tracking-widest transition-all rounded-[var(--radius-element)]", effects.isVocalFocusEnabled ? "bg-cyan-500 text-white shadow-[0_0_14px_rgba(6,182,212,0.45)]" : "opacity-30 hover:opacity-100")}
                       >
-                         <MicOff className="w-3.5 h-3.5" /> Vocal Reducer
+                         <Sparkles className="w-3.5 h-3.5" /> Vocal Focus
                       </button>
-                      
-                      <div className="w-px h-6 bg-[var(--color-outline)] mx-1" />
-                      
-                      <button 
-                         onClick={() => setEffects({ ...effects, isAutoEQEnabled: !effects.isAutoEQEnabled })}
-                         className={cn("px-6 py-3 flex items-center gap-2 text-[9px] font-black uppercase tracking-widest transition-all rounded-[var(--radius-element)]", effects.isAutoEQEnabled ? "bg-cyan-500 text-white" : "opacity-30 hover:opacity-100")}
+                      <div className="w-px h-5 bg-[var(--color-outline)] mx-0.5" />
+                       <button 
+                         onClick={handleDemix}
+                         disabled={isDemixing || !!track?.stems}
+                         className={cn("px-5 py-2.5 flex items-center gap-2 text-[9px] font-black uppercase tracking-widest transition-all rounded-[var(--radius-element)]", track?.stems ? "bg-green-600 text-white" : "bg-[var(--color-primary)]/10 text-[var(--color-primary)] border border-[var(--color-primary)]/20 hover:bg-[var(--color-primary)]/20")}
                       >
-                         <Sparkles className="w-3.5 h-3.5" /> Auto-EQ
-                      </button>
-                      <button 
-                         onClick={() => setEffects({ ...effects, isMultibandEnabled: !effects.isMultibandEnabled })}
-                         className={cn("px-6 py-3 flex items-center gap-2 text-[9px] font-black uppercase tracking-widest transition-all rounded-[var(--radius-element)]", effects.isMultibandEnabled ? "bg-amber-500 text-white" : "opacity-30 hover:opacity-100")}
-                      >
-                         <Zap className="w-3.5 h-3.5" /> Multi-Band Comp
+                         {isDemixing ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Music2 className="w-3.5 h-3.5" />}
+                         {track?.stems ? "STEMS READY" : (isDemixing ? "DEMIXING..." : "AI STEM SEP")}
                       </button>
                   </div>
               </div>
@@ -237,7 +257,7 @@ const StudioView: React.FC<Props> = ({
                                    </div>
                                ))}
                            </div>
-                      </div>
+                       </div>
 
                       {/* Multi-Column Knob Rack - The actual scrollable part */}
                       <div className="flex-1 overflow-y-auto p-2 grid grid-cols-2 gap-y-6 gap-x-2 no-scrollbar border-b border-[var(--color-outline)]">
@@ -268,7 +288,7 @@ const StudioView: React.FC<Props> = ({
                           />
                           <AudioKnob 
                             label="Room Size"
-                            value={effects.reverbRoomSize * 10}
+                            value={(effects.reverbRoomSize || 1.0) * 10}
                             min={1}
                             max={80}
                             defaultValue={10}
@@ -297,7 +317,28 @@ const StudioView: React.FC<Props> = ({
                             min={0}
                             max={100}
                             defaultValue={0}
+                            suffix="Hz"
                             onChange={(v) => setEffects({ ...effects, tapeFlutter: v })}
+                          />
+                          <div className="col-span-2 h-px bg-[var(--color-outline)] my-2 opacity-20" />
+                          <AudioKnob 
+                            label="Vocal Pitch"
+                            value={effects.vocalPitch}
+                            min={-12}
+                            max={12}
+                            defaultValue={0}
+                            disabled={!track?.stems}
+                            suffix="st"
+                            onChange={(v) => setEffects({ ...effects, vocalPitch: v })}
+                          />
+                          <AudioKnob 
+                            label="Vocal Tone"
+                            value={effects.vocalTone}
+                            min={-100}
+                            max={100}
+                            defaultValue={0}
+                            disabled={!track?.stems}
+                            onChange={(v) => setEffects({ ...effects, vocalTone: v })}
                           />
                       </div>
                   </div>

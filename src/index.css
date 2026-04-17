@@ -2,42 +2,55 @@
 /** @tailwind base; @tailwind components; @tailwind utilities; @tailwind theme; */
 
 @theme {
+  /* ── OLED / Dark (default) ─────────────────────────────── */
   --color-primary: #ffffff;
   --color-primary-rgb: 255, 255, 255;
   --color-on-primary: #000000;
   
   --color-surface: #000000;
   --color-surface-rgb: 0, 0, 0;
-  --color-on-surface: #ffffff;
+  --color-on-surface: #e8e8e8;      /* Slightly off-white — easy on eyes against OLED */
   
-  --color-surface-variant: #000000;
-  --color-on-surface-variant: rgba(255, 255, 255, 0.7);
+  /* Cards & panels — perceptible lift above pure black */
+  --color-surface-variant: #141414;
+  --color-on-surface-variant: rgba(232, 232, 232, 0.7);
   
-  --color-outline: rgba(255, 255, 255, 0.1);
-  
-  /* Hierarchy: 16px Container / 8px Elements */
+  /* Borders — clearly visible without being noisy */
+  --color-outline: rgba(255, 255, 255, 0.14);
+
+  /* Radius scale */
   --radius-container: 16px;
   --radius-element: 8px;
-  
   --radius-4xl: var(--radius-container);
   --radius-5xl: var(--radius-container);
 }
 
-/* Light Theme Overrides */
+/* ── Light / White theme ──────────────────────────────────── */
 .light {
-  --color-primary: #000000;
-  --color-primary-rgb: 0, 0, 0;
+  --color-primary: #181818;
+  --color-primary-rgb: 24, 24, 24;
   --color-on-primary: #ffffff;
   
-  --color-surface: #ffffff;
-  --color-surface-rgb: 255, 255, 255;
-  --color-on-surface: #000000;
+  --color-surface: #fafafa;
+  --color-surface-rgb: 250, 250, 250;
+  --color-on-surface: #181818;
   
-  --color-surface-variant: #f5f5f5;
-  --color-on-surface-variant: rgba(0, 0, 0, 0.6);
-  
-  --color-outline: rgba(0, 0, 0, 0.05);
+  /* Cards clearly distinct from white background */
+  --color-surface-variant: #e8e8e8;
+  --color-on-surface-variant: rgba(24, 24, 24, 0.7);
+
+  /* Visible borders on white */
+  --color-outline: rgba(0, 0, 0, 0.12);
 }
+
+/* ── Opacity recalibation for OLED dark readability ── */
+/* Tailwind's opacity utilities at default values are too dim against pure OLED black. */
+/* These overrides bring secondary/muted text to just-readable contrast levels. */
+:root:not(.light) .opacity-10  { opacity: 0.22; }
+:root:not(.light) .opacity-20  { opacity: 0.38; }
+:root:not(.light) .opacity-30  { opacity: 0.52; }
+:root:not(.light) .opacity-40  { opacity: 0.65; }
+:root:not(.light) .opacity-60  { opacity: 0.78; }
 
 @layer base {
   * {
@@ -56,7 +69,7 @@
   }
 
   .suite-button {
-    @apply px-6 py-2.5 rounded-[var(--radius-element)] font-black uppercase tracking-widest text-[10px] transition-all duration-150 active:scale-95 disabled:opacity-20 flex items-center justify-center gap-2;
+    @apply px-6 py-2.5 rounded-[var(--radius-element)] font-black uppercase tracking-widest text-[10px] transition-all duration-150 active:scale-95 disabled:opacity-40 flex items-center justify-center gap-2;
   }
 
   .suite-button-primary {
@@ -67,29 +80,46 @@
     @apply border border-[var(--color-outline)] hover:bg-[var(--color-on-surface)] hover:text-[var(--color-surface)];
   }
 
+  .suite-button-ghost {
+    @apply px-3 py-1.5 rounded-[var(--radius-element)] font-black uppercase tracking-widest text-[9px] transition-all duration-150 active:scale-95 flex items-center gap-1.5;
+  }
+
   .suite-input {
-    @apply bg-[var(--color-surface-variant)] border border-[var(--color-outline)] rounded-[var(--radius-element)] px-6 py-4 text-sm focus:outline-none focus:border-[var(--color-primary)]/40 transition-all placeholder:opacity-30;
+    @apply bg-[var(--color-surface-variant)] border border-[var(--color-outline)] rounded-[var(--radius-element)] px-6 py-4 text-sm focus:outline-none transition-all placeholder:opacity-50;
   }
 
   .suite-input:focus {
-    @apply border-[var(--color-primary)]/40;
+    border-color: rgba(var(--color-primary-rgb), 0.5);
   }
 
   .suite-chip {
     @apply px-4 py-1.5 rounded-[var(--radius-element)] bg-[var(--color-outline)] text-[10px] font-bold uppercase tracking-wider;
   }
 
-  /* Professional Glassmorphism */
+  /* ── Glassmorphism ── */
+  /* OLED default: subtle white tint separates glass from pure black background */
   .suite-glass-subtle {
-    @apply backdrop-blur-md bg-[rgba(var(--color-surface-rgb),0.3)];
+    @apply backdrop-blur-md;
+    background: rgba(255, 255, 255, 0.045);
     will-change: backdrop-filter;
   }
 
   .suite-glass-deep {
-    @apply backdrop-blur-3xl bg-[rgba(var(--color-surface-rgb),0.7)];
+    @apply backdrop-blur-3xl;
+    background: rgba(255, 255, 255, 0.07);
     will-change: backdrop-filter;
-    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37);
+    box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.55);
   }
+}
+
+/* ── Light mode glass — dark tint on white ── */
+.light .suite-glass-subtle {
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.light .suite-glass-deep {
+  background: rgba(0, 0, 0, 0.055);
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.10);
 }
 
 /* Standardized Transitions */
@@ -97,20 +127,11 @@
   transition: all 150ms cubic-bezier(0.1, 0.9, 0.2, 1);
 }
 
-/* Scrollbar Refinement */
-::-webkit-scrollbar {
-  width: 4px;
-}
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-::-webkit-scrollbar-thumb {
-  background: var(--color-outline);
-  border-radius: 10px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: var(--color-primary);
-}
+/* Scrollbar */
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-outline); border-radius: 10px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-primary); }
 
 /* Animations */
 @keyframes float {
@@ -122,6 +143,7 @@
   animation: float 6s ease-in-out infinite;
 }
 
+/* Electron title bar drag region */
 .title-bar-drag {
   -webkit-app-region: drag;
   pointer-events: auto !important;
