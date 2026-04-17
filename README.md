@@ -26,7 +26,7 @@ This application is strictly optimized for **Industrial & Enterprise Windows env
 
 ### 🎛️ Professional Mastering Chain (V3 Engine)
 - **3-Way Multi-Band Compressor**: A high-fidelity crossover matrix that splits audio into Lows (< 250Hz), Mids (250Hz - 4kHz), and Highs (> 4kHz) for surgical dynamic control.
-- **Auto-EQ (AI-Driven)**: Analyzes track frequency response and suggests corrective curves (Sub, Bass, Mid, Treble, Air).
+- **Auto-EQ (Algorithmic)**: Analyzes track frequency response and suggests corrective curves (Sub, Bass, Mid, Treble, Air).
 - **Slowed + Reverb**: Professional IR-convolution reverb with a custom Impulse Vault and high-precision speed stretching.
 - **Nightcore**: High-speed resampling with frequency preservation and "Hyper-pop" aesthetic.
 - **Flawless Seek Sync**: Physically decoupled 'Real World Time' and 'Buffer Time' ensures perfect scrubbing even during heavy speed/pitch manipulation.
