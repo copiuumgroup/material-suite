@@ -28,11 +28,6 @@ export const AudioKnob: React.FC<Props> = ({
   
   const rotation = ((value - min) / (max - min)) * 270 - 135;
 
-  // Bipolar logic: if defaultValue is roughly at the midpoint, we render outward from center
-  const range = max - min;
-  const midPoint = min + range / 2;
-  const isBipolar = defaultValue !== undefined && Math.abs(defaultValue - midPoint) < range * 0.01;
-
   const handlePointerDown = (e: React.PointerEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -58,24 +53,6 @@ export const AudioKnob: React.FC<Props> = ({
     if (defaultValue !== undefined) onChange(defaultValue);
   };
 
-  // SVG math: 270 degree arc starting at -135deg (7:30)
-  const totalLength = 94.24; // 270 degrees on a radius 20 circle
-  const progressPercent = (value - min) / (max - min);
-  
-  let dashArray = `${progressPercent * totalLength} 125.66`;
-  let dashOffset = "15.7"; // Aligns with -135deg starting point
-
-  if (isBipolar) {
-     const centerPercent = (defaultValue - min) / (max - min);
-     const diff = progressPercent - centerPercent;
-     dashArray = `${Math.abs(diff) * totalLength} 125.66`;
-     // Shift offset based on whether we are left or right of center
-     const centerOffset = 15.7 - (centerPercent * totalLength);
-     dashOffset = diff > 0 ? `${centerOffset}` : `${centerOffset + (diff * totalLength)}`;
-  } else {
-     dashOffset = "15.7";
-  }
-
   return (
     <div className="flex flex-col items-center gap-2 select-none group">
       <span className="text-[9px] font-black uppercase tracking-widest opacity-40 group-hover:opacity-100 transition-opacity">
@@ -91,26 +68,14 @@ export const AudioKnob: React.FC<Props> = ({
         className="relative w-14 h-14 cursor-ns-resize flex items-center justify-center transition-all duration-300 suite-glass-subtle rounded-full shadow-lg"
       >
         <svg className="w-12 h-12 transform rotate-[135deg]">
-             <circle 
+              <circle 
                 cx="24" cy="24" r="20" 
                 fill="none" 
                 stroke="currentColor" 
                 strokeWidth="2"
-                className="opacity-5"
-                strokeDasharray={`${totalLength} 125.66`}
+                className="opacity-10"
+                strokeDasharray="94.24 125.66"
                 strokeDashoffset="0"
-             />
-             <motion.circle 
-                cx="24" cy="24" r="20" 
-                fill="none" 
-                stroke="var(--color-primary)" 
-                strokeWidth="2"
-                strokeLinecap="round"
-                animate={{
-                    strokeDasharray: dashArray,
-                    strokeDashoffset: parseFloat(dashOffset)
-                }}
-                className="opacity-40"
              />
         </svg>
 
@@ -118,14 +83,14 @@ export const AudioKnob: React.FC<Props> = ({
             style={{ rotate: rotation }}
             className={cn(
                 "absolute inset-0 flex items-center justify-center",
-                isDragging ? "opacity-100" : "opacity-60"
+                isDragging ? "opacity-100 drop-shadow-[0_0_4px_var(--color-primary)]" : "opacity-100"
             )}
         >
-            <div className="h-5 w-1 mb-6 bg-[var(--color-primary)] rounded-full" />
+            <div className="h-4 w-1.5 mb-6 bg-[var(--color-primary)] rounded-full shadow-lg" />
         </motion.div>
         
-        <div className="absolute w-8 h-8 rounded-full flex items-center justify-center bg-[#111] shadow-inner">
-             <div className="w-1 h-1 rounded-full bg-white opacity-10" />
+        <div className="absolute w-8 h-8 rounded-full flex items-center justify-center bg-[var(--color-surface-variant)] border border-[var(--color-outline)] shadow-xl">
+             <div className="w-1.5 h-1.5 rounded-full bg-[var(--color-primary)] opacity-40 shadow-[0_0_4px_currentColor]" />
         </div>
       </div>
 

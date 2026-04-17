@@ -1,7 +1,7 @@
 {
   "name": "material-audio-tool",
   "private": true,
-  "version": "0.0.0-dev-dqbai",
+  "version": "0.0.0-dev-u8z9l",
   "type": "module",
   "main": "dist-electron/main.js",
   "description": "Material Audio Mastery Studio",

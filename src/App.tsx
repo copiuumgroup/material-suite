@@ -5,6 +5,7 @@ const StudioView = lazy(() => import('./views/StudioView'));
 const YTDLPView = lazy(() => import('./views/YTDLPView'));
 import SidebarRail from './components/SidebarRail';
 import { SettingsModal } from './components/SettingsModal';
+import { RenderModal, type RenderConfig } from './components/studio/RenderModal';
 import type { ViewType } from './components/SidebarRail';
 import { db, type ProjectMetadata, type ImpulseData } from './db/database';
 import type { Track } from './types';
@@ -51,6 +52,7 @@ function App() {
   });
 
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isRenderModalOpen, setIsRenderModalOpen] = useState(false);
   const [limiterSettings, setLimiterSettings] = useState({
     threshold: -3.0,
     ratio: 12,
@@ -70,7 +72,7 @@ function App() {
 
   const [currentView, setCurrentView] = useState<ViewType>('vault');
   const [isPlayerDismissed, setIsPlayerDismissed] = useState(false);
-  const { exportAudio } = useExporter();
+  const { exportAudio, exportVideo, isExporting, progress } = useExporter();
 
   const [tracks, setTracks] = useState<Track[]>([]);
   const [activeTrackId, setActiveTrackId] = useState<string | null>(null);
@@ -82,7 +84,7 @@ function App() {
     reverbWet: 0,
     isNightcore: false,
     isVocalReduced: false,
-    quality: 'fast',
+    isMultibandEnabled: false,
     isAutoEQEnabled: false,
     customIRBuffer: null,
     saturation: 0,
@@ -288,20 +290,55 @@ function App() {
     resumeAudioContext();
   };
 
-  const handleExport = async () => {
+  const handleExportClick = () => setIsRenderModalOpen(true);
+
+  const executeRender = async (config: RenderConfig) => {
     if (!activeTrack || !activeTrack.buffer) return;
     
     try {
-      // Phase 1: Offline Mastering
+      // Phase 1: Smart Filename Generation
+      const tags: string[] = [];
+      if (effects.speed === 0.8 && effects.reverbWet === 0.4 && !effects.isNightcore) {
+        tags.push("Slowed + Reverb");
+      } else if (effects.isNightcore) {
+        tags.push("Nightcore");
+      } else if (effects.speed !== 1.0) {
+        tags.push(`${Math.round(effects.speed * 100)}% Speed`);
+      }
+      if (effects.isVocalReduced) tags.push("Vocal Reduced");
+      if (effects.saturation > 10) tags.push("Distorted");
+
+      const tagString = tags.length > 0 ? ` (${tags.join(', ')})` : '';
+      const baseName = activeTrack.file.name.replace(/\.[^/.]+$/, "");
+      const smartFilename = `${baseName}${tagString}`;
+
+      // Phase 2: Offline Audio Mastering
       const masteredBuffer = await studioEngine.renderMaster(activeTrack.buffer, effects);
       
-      // Phase 2: Encode to 320kbps MP3
-      const blob = await exportAudio(masteredBuffer, 'mp3', '320', activeTrack.file.name);
+      // Phase 3: Execute Export
+      let blob: Blob | null = null;
+      let finalFilename = '';
       
+      if (config.type === 'audio') {
+        blob = await exportAudio(masteredBuffer, config.audioFormat, '320', smartFilename);
+        finalFilename = `${smartFilename}.${config.audioFormat}`;
+      } else {
+        blob = await exportVideo({
+          audioBuffer: masteredBuffer,
+          filename: smartFilename,
+          resolution: config.videoResolution,
+          preset: config.videoPreset,
+          profile: config.videoProfile,
+          coverArtBase64: activeTrack.metadata?.coverArt
+        });
+        finalFilename = `${smartFilename}.mp4`;
+      }
+      
+      // Phase 4: Save to Disk
       if (blob && window.electronAPI) {
         const arrayBuffer = await blob.arrayBuffer();
-        await window.electronAPI.saveFile(activeTrack.file.name, arrayBuffer);
-        toast(`Exported: ${activeTrack.file.name}`, 'success');
+        await window.electronAPI.saveFile(finalFilename, arrayBuffer);
+        toast(`Exported: ${finalFilename}`, 'success');
       }
     } catch (error) {
       console.error('Export Failed:', error);
@@ -368,7 +405,7 @@ function App() {
               analyser={analyser}
               effects={effects}
               setEffects={setEffects}
-              onExport={handleExport}
+              onExport={handleExportClick}
               impulses={impulses}
               onIRUpload={handleIRUpload}
               onIRSelect={selectImpulse}
@@ -416,9 +453,29 @@ function App() {
                effects={effects}
                setEffects={setEffects}
                onClose={() => setIsPlayerDismissed(true)}
-               onExport={handleExport}
+               onExport={handleExportClick}
              />
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      <RenderModal 
+        isOpen={isRenderModalOpen}
+        onClose={() => setIsRenderModalOpen(false)}
+        onRender={executeRender}
+      />
+      
+      {/* Global Exporting Overlay */}
+      <AnimatePresence>
+        {isExporting && (
+           <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="fixed inset-0 z-[200] bg-black/80 backdrop-blur-md flex flex-col items-center justify-center">
+               <div className="w-64 h-2 bg-[var(--color-surface)] rounded-full overflow-hidden border border-[var(--color-outline)]">
+                   <div className="h-full bg-[var(--color-primary)] transition-all duration-300" style={{ width: `${progress}%` }} />
+               </div>
+               <span className="mt-4 text-xs font-black uppercase tracking-widest text-[var(--color-primary)]">
+                   {progress}% Rendered
+               </span>
+           </motion.div>
         )}
       </AnimatePresence>
     </div>

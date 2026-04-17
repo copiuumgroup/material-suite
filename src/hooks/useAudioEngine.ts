@@ -231,7 +231,7 @@ export function useAudioEngine(
             release: 0.25
         };
 
-        if (effects.quality === 'pro') {
+        if (effects.isMultibandEnabled) {
             limiterRef.current.threshold.setTargetAtTime(settings.threshold, ctx.currentTime, 0.1);
             limiterRef.current.ratio.setTargetAtTime(settings.ratio, ctx.currentTime, 0.1);
             limiterRef.current.attack.setTargetAtTime(settings.attack, ctx.currentTime, 0.1);
@@ -285,8 +285,7 @@ export function useAudioEngine(
     if (isPlaying && activeBuffer && audioCtxRef.current) {
       const updateProgress = () => {
         if (!audioCtxRef.current) return;
-        const elapsed = (audioCtxRef.current.currentTime - startedAtRef.current) * effects.speed;
-        // The effective duration is longer when slowed, shorter when faster.
+        const elapsed = (audioCtxRef.current.currentTime - startedAtRef.current);
         const effectiveDuration = activeBuffer.duration / effects.speed;
         setCurrentTime(elapsed);
         
@@ -325,8 +324,9 @@ export function useAudioEngine(
       reverbNodeRef.current!.connect(reverbGainRef.current!);
       reverbGainRef.current!.connect(gainNodeRef.current);
 
-      source.start(0, pausedAt / effects.speed);
-      startedAtRef.current = audioCtxRef.current.currentTime - (pausedAt / effects.speed);
+      const bufferOffset = pausedAt * effects.speed;
+      source.start(0, bufferOffset);
+      startedAtRef.current = audioCtxRef.current.currentTime - pausedAt;
       sourceRef.current = source;
       
       source.onended = () => {
@@ -338,8 +338,9 @@ export function useAudioEngine(
       };
     } else {
       if (sourceRef.current) {
-        const elapsed = (audioCtxRef.current.currentTime - startedAtRef.current) * effects.speed;
-        setPausedAt(elapsed % activeBuffer.duration);
+        const elapsed = (audioCtxRef.current.currentTime - startedAtRef.current);
+        const effectiveDuration = activeBuffer.duration / effects.speed;
+        setPausedAt(elapsed % effectiveDuration);
         sourceRef.current.onended = null;
         sourceRef.current.stop();
         sourceRef.current.disconnect();
@@ -361,9 +362,10 @@ export function useAudioEngine(
     if (!activeBuffer) return;
     const wasPlaying = isPlaying;
     if (wasPlaying) setIsPlaying(false);
-    const bufferPos = Math.max(0, Math.min(time, activeBuffer.duration));
-    setPausedAt(bufferPos);
-    setCurrentTime(bufferPos);
+    const effectiveDuration = activeBuffer.duration / effects.speed;
+    const realTimePos = Math.max(0, Math.min(time, effectiveDuration));
+    setPausedAt(realTimePos);
+    setCurrentTime(realTimePos);
     if (wasPlaying) setTimeout(() => setIsPlaying(true), 10);
   };
 

@@ -5,7 +5,7 @@ export interface StudioEffectParams {
   reverbWet: number;
   isNightcore: boolean;
   isVocalReduced: boolean;
-  quality: 'fast' | 'pro';
+  isMultibandEnabled: boolean;
   isAutoEQEnabled: boolean;
   customIRBuffer: AudioBuffer | null;
   saturation: number; // 0..100
@@ -154,7 +154,7 @@ class AlgorithmEngine {
 
   // --- MASTER PROCESSING ---
   public async renderMaster(buffer: AudioBuffer, params: StudioEffectParams): Promise<AudioBuffer> {
-    studioAPI.emitStudioLog(`STARTING ${params.quality.toUpperCase()} MASTER RENDER: ${params.speed}x speed, ${Math.round(params.reverbWet * 100)}% reverb...`);
+    studioAPI.emitStudioLog(`STARTING MASTER RENDER: ${params.speed}x speed, ${Math.round(params.reverbWet * 100)}% reverb...`);
 
     const tailSeconds = params.reverbRoomSize || 3.0;
     const renderedSampleRate = buffer.sampleRate;
@@ -310,12 +310,11 @@ class AlgorithmEngine {
         currentInput = merger;
     }
 
-    // 7. Advanced Mastering Chain (Pro Mode)
+    // 7. Advanced Mastering Chain
     let finalNode: AudioNode = currentInput;
 
-    if (params.quality === 'pro') {
-      // 4.1 Auto-EQ Injection
-      if (params.isAutoEQEnabled && params.analysis) {
+    // 7.1 Auto-EQ Injection
+    if (params.isAutoEQEnabled && params.analysis) {
         const eq = params.analysis.suggestedEQ;
         
         const createFilter = (freq: number, gain: number, type: BiquadFilterType) => {
@@ -338,27 +337,79 @@ class AlgorithmEngine {
         mid.connect(treble);
         treble.connect(air);
         finalNode = air;
-      }
+    }
 
-      // 4.2 Transparent Mastering Limiter
-      // We use a multi-stage approach with DynamicsCompressorNode
-      const limiter = offlineCtx.createDynamicsCompressor();
-      
-      const settings = params.limiter || {
-        threshold: -3.0,
-        ratio: 12,
-        attack: 0.003,
-        release: 0.25
-      };
+    // 7.2 Multi-Band Compressor
+    if (params.isMultibandEnabled) {
+        studioAPI.emitStudioLog("ALGORITHM: Engaging 3-Way Multi-Band Compressor...");
+        
+        // 3-Way Crossover Frequencies: 250Hz and 4000Hz
+        
+        // --- LOW BAND (< 250Hz) ---
+        // Tight, heavy compression to lock the bass in place
+        const lowLPF = offlineCtx.createBiquadFilter();
+        lowLPF.type = 'lowpass';
+        lowLPF.frequency.value = 250;
+        const lowComp = offlineCtx.createDynamicsCompressor();
+        lowComp.threshold.value = -12;
+        lowComp.ratio.value = 6;
+        lowComp.attack.value = 0.005; // 5ms attack
+        lowComp.release.value = 0.1;
 
-      limiter.threshold.value = settings.threshold;
-      limiter.knee.value = 30;
-      limiter.ratio.value = settings.ratio;
-      limiter.attack.value = settings.attack;
-      limiter.release.value = settings.release;
+        // --- MID BAND (250Hz - 4000Hz) ---
+        // Gentle compression for vocals/guitars to retain dynamics
+        const midHPF = offlineCtx.createBiquadFilter();
+        midHPF.type = 'highpass';
+        midHPF.frequency.value = 250;
+        const midLPF = offlineCtx.createBiquadFilter();
+        midLPF.type = 'lowpass';
+        midLPF.frequency.value = 4000;
+        const midComp = offlineCtx.createDynamicsCompressor();
+        midComp.threshold.value = -18;
+        midComp.ratio.value = 3;
+        midComp.attack.value = 0.02; // 20ms attack allows transients through
+        midComp.release.value = 0.3;
 
-      finalNode.connect(limiter);
-      finalNode = limiter;
+        // --- HIGH BAND (> 4000Hz) ---
+        // Very fast, light compression to catch harsh sibilance/cymbals
+        const highHPF = offlineCtx.createBiquadFilter();
+        highHPF.type = 'highpass';
+        highHPF.frequency.value = 4000;
+        const highComp = offlineCtx.createDynamicsCompressor();
+        highComp.threshold.value = -24;
+        highComp.ratio.value = 4;
+        highComp.attack.value = 0.001; // 1ms attack (fastest)
+        highComp.release.value = 0.05;
+
+        // Summing bus
+        const sumBus = offlineCtx.createGain();
+        sumBus.gain.value = 1.0;
+
+        // Route Low Band
+        finalNode.connect(lowLPF);
+        lowLPF.connect(lowComp);
+        lowComp.connect(sumBus);
+
+        // Route Mid Band (HPF -> LPF -> Comp)
+        finalNode.connect(midHPF);
+        midHPF.connect(midLPF);
+        midLPF.connect(midComp);
+        midComp.connect(sumBus);
+
+        // Route High Band
+        finalNode.connect(highHPF);
+        highHPF.connect(highComp);
+        highComp.connect(sumBus);
+
+        // Optional Final Brickwall Limiter to prevent clipping from makeup gains
+        const limiter = offlineCtx.createDynamicsCompressor();
+        limiter.threshold.value = -0.5;
+        limiter.ratio.value = 20;
+        limiter.attack.value = 0.001;
+        limiter.release.value = 0.1;
+
+        sumBus.connect(limiter);
+        finalNode = limiter;
     }
 
     finalNode.connect(offlineCtx.destination);

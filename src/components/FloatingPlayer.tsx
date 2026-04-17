@@ -142,8 +142,8 @@ const FloatingPlayer: React.FC<Props> = ({
         <div className="w-[180px] flex items-center justify-end gap-6 shrink-0 relative z-10 font-bold">
            <div className="flex flex-col items-end">
               <span className="text-[8px] uppercase tracking-widest opacity-20">Grade</span>
-              <span className={cn("text-xs font-black", effects.quality === 'pro' ? "text-[var(--color-primary)]" : "")}>
-                {effects.quality.toUpperCase()}
+              <span className={cn("text-xs font-black", effects.isMultibandEnabled ? "text-[var(--color-primary)]" : "")}>
+                {effects.isMultibandEnabled ? 'MULTI-BAND' : 'RAW'}
               </span>
            </div>
            {onExport ? (

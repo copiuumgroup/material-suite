@@ -184,6 +184,12 @@ const StudioView: React.FC<Props> = ({
                       >
                          <Sparkles className="w-3.5 h-3.5" /> Auto-EQ
                       </button>
+                      <button 
+                         onClick={() => setEffects({ ...effects, isMultibandEnabled: !effects.isMultibandEnabled })}
+                         className={cn("px-6 py-3 flex items-center gap-2 text-[9px] font-black uppercase tracking-widest transition-all rounded-[var(--radius-element)]", effects.isMultibandEnabled ? "bg-amber-500 text-white" : "opacity-30 hover:opacity-100")}
+                      >
+                         <Zap className="w-3.5 h-3.5" /> Multi-Band Comp
+                      </button>
                   </div>
               </div>
           </div>
@@ -198,24 +204,6 @@ const StudioView: React.FC<Props> = ({
 
                   {/* Scrollable Rack Container */}
                   <div className="flex-1 flex flex-col gap-6 min-h-0 overflow-hidden">
-                      <div className="flex flex-col gap-3 shrink-0">
-                           <span className="text-[9px] font-black uppercase tracking-widest opacity-40">Mastering Grade</span>
-                           <div className="flex p-1 border border-[var(--color-outline)] suite-glass-subtle rounded-[var(--radius-element)]">
-                               <button 
-                                 onClick={() => setEffects({ ...effects, quality: 'fast' })}
-                                 className={cn("flex-1 py-1.5 text-[8px] font-black uppercase transition-all", effects.quality === 'fast' ? "bg-[var(--color-surface)] text-[var(--color-on-surface)]" : "opacity-30", "rounded-[var(--radius-element)]")}
-                               >
-                                 Fast
-                               </button>
-                               <button 
-                                 onClick={() => setEffects({ ...effects, quality: 'pro' })}
-                                 className={cn("flex-1 py-1.5 text-[8px] font-black uppercase transition-all", effects.quality === 'pro' ? "bg-[var(--color-primary)] text-[var(--color-on-primary)] shadow-lg" : "opacity-30", "rounded-[var(--radius-element)]")}
-                               >
-                                 Pro (Ultra)
-                               </button>
-                           </div>
-                      </div>
-
                       <div className="flex flex-col gap-3 shrink-0">
                            <div className="flex justify-between items-center">
                                <span className="text-[9px] font-black uppercase tracking-widest opacity-40">Impulse Vault</span>
