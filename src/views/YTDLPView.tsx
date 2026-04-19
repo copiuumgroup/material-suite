@@ -3,21 +3,8 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { CloudDownload, Loader2, CheckCircle2, AlertTriangle, Search, Activity, Play, Music, ListPlus, Trash2, ExternalLink } from 'lucide-react';
 import IngestStage from '../components/IngestStage';
 import { studioAPI } from '../services/engine/MaterialStudioAPI';
-
-interface StagedItem {
-  id: string;
-  url: string;
-  info: any;
-}
-
-interface QueueItem {
-  id: string;
-  url: string;
-  title?: string;
-  uploader?: string;
-  status: 'idle' | 'processing' | 'success' | 'error';
-  error?: string;
-}
+import { useLiveQuery } from 'dexie-react-hooks';
+import { db, type StagedItem } from '../db/database';
 
 interface SearchResult {
   id: string;
@@ -37,15 +24,18 @@ const YTDLPView: React.FC = () => {
 
   const [cloudUrls, setCloudUrls] = useState('');
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
-  const [stagedItems, setStagedItems] = useState<StagedItem[]>([]);
-  const [queue, setQueue] = useState<QueueItem[]>([]);
+  
+  const stagedItems = useLiveQuery(() => db.stagedItems.toArray()) || [];
+  const queue = useLiveQuery(() => db.downloadQueue.toArray()) || [];
+  
   const [isProcessing, setIsProcessing] = useState(false);
   const [isStaging, setIsStaging] = useState(false);
   
   const [masterLogs, setMasterLogs] = useState<string[]>([]);
-  const [overallProgress, setOverallProgress] = useState(0);
   const [ingestMode, setIngestMode] = useState<'audio' | 'video'>('audio');
   const [targetDirectory, setTargetDirectory] = useState<string>('');
+  const [concurrency, setConcurrency] = useState(3);
+  const [progressMap, setProgressMap] = useState<Record<string, number>>({});
   
   const logEndRef = useRef<HTMLDivElement>(null);
   const isCancelledRef = useRef(false);
@@ -57,10 +47,21 @@ const YTDLPView: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const unsubDownloads = studioAPI.subscribeToDownloads((data) => {
-      setMasterLogs(prev => [...prev.slice(-100), data]);
+    const unsubDownloads = studioAPI.subscribeToDownloads((payload: { url: string, data: string }) => {
+      const { url, data } = payload;
+      
+      // Extract progress
       const progressMatch = data.match(/(\d+\.?\d*)%/);
-      if (progressMatch) setOverallProgress(parseFloat(progressMatch[1]));
+      if (progressMatch) {
+        const percent = parseFloat(progressMatch[1]);
+        setProgressMap(prev => ({ ...prev, [url]: percent }));
+        return; // Don't spam the master log with percentages
+      }
+
+      // Filter noise from master logs
+      if (data.includes('at') && data.includes('ETA')) return; 
+
+      setMasterLogs(prev => [...prev.slice(-100), data.trim()]);
     });
     return () => { unsubDownloads(); };
   }, []);
@@ -108,15 +109,16 @@ const YTDLPView: React.FC = () => {
         setStatusMessage(`Analyzing: ${url.substring(0, 30)}...`);
       const res = await window.electronAPI.ytdlpGetInfo(url);
       if (res.success && res.infos) {
-        const newStaged = res.infos.map((info: any) => ({
+        const newStaged: StagedItem[] = res.infos.map((info: any) => ({
            id: Math.random().toString(36).substr(2, 9),
            url: info.webpage_url || url,
            info: {
              ...info,
              thumbnail: info.thumbnail?.replace('http:', 'https:') // Ensure HTTPS for CSP
-           }
+           },
+           addedAt: Date.now()
         }));
-        setStagedItems(prev => [...prev, ...newStaged]);
+        await db.stagedItems.bulkAdd(newStaged);
       }
       }
     }
@@ -125,15 +127,16 @@ const YTDLPView: React.FC = () => {
     if (stagedItems.length > 0 || urls.length > 0) setActiveTab('urls');
   };
 
-  const commitToQueue = (item: StagedItem) => {
-    setQueue(prev => [...prev, {
+  const commitToQueue = async (item: StagedItem) => {
+    await db.downloadQueue.add({
       id: item.id,
       url: item.url,
       title: item.info.title,
       uploader: item.info.uploader,
-      status: 'idle'
-    }]);
-    setStagedItems(prev => prev.filter(s => s.id !== item.id));
+      status: 'idle',
+      addedAt: Date.now()
+    });
+    await db.stagedItems.delete(item.id);
   };
 
   const processQueue = async () => {
@@ -141,10 +144,14 @@ const YTDLPView: React.FC = () => {
     setIsProcessing(true);
     isCancelledRef.current = false;
     
-    for (let i = 0; i < queue.length; i++) {
-        const item = queue[i];
-        if (isCancelledRef.current || item.status === 'success') continue;
-        setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'processing' } : q));
+    const itemsToProcess = [...queue.filter(q => q.status !== 'success')];
+    
+    const runWorker = async () => {
+      while (itemsToProcess.length > 0 && !isCancelledRef.current) {
+        const item = itemsToProcess.shift();
+        if (!item) break;
+
+        await db.downloadQueue.update(item.id, { status: 'processing' });
 
         try {
             if (!window.electronAPI) throw new Error("Native Bridge Offline");
@@ -153,11 +160,16 @@ const YTDLPView: React.FC = () => {
                 destinationPath: targetDirectory
             });
             if (!res.success) throw new Error(res.error);
-            setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'success' } : q));
+            await db.downloadQueue.update(item.id, { status: 'success' });
         } catch (e: any) {
-            setQueue(prev => prev.map(q => q.id === item.id ? { ...q, status: 'error', error: e.message } : q));
+            await db.downloadQueue.update(item.id, { status: 'error', error: e.message });
         }
-    }
+      }
+    };
+
+    const pool = Array.from({ length: Math.min(concurrency, itemsToProcess.length) }).map(() => runWorker());
+    await Promise.all(pool);
+    
     setIsProcessing(false);
   };
 
@@ -209,6 +221,25 @@ const YTDLPView: React.FC = () => {
             <button onClick={() => window.electronAPI?.selectDownloadDirectory().then(p => p && setTargetDirectory(p))} className="suite-button-ghost text-[9px] opacity-40 hover:opacity-100">
               Vault: {targetDirectory ? targetDirectory.split('\\').pop() : 'Default'}
             </button>
+
+            <div className="flex items-center gap-2 bg-[var(--color-surface-variant)] px-3 py-1.5 rounded-[var(--radius-element)] border border-[var(--color-outline)]">
+                <Activity className="w-3 h-3 opacity-30" />
+                <span className="text-[8px] font-black uppercase tracking-widest opacity-40 mr-1">Threads:</span>
+                <div className="flex gap-1">
+                    {[1, 2, 3, 5].map(n => (
+                        <button 
+                            key={n} 
+                            onClick={() => setConcurrency(n)}
+                            className={cn(
+                                "w-5 h-5 rounded flex items-center justify-center text-[9px] font-black transition-all",
+                                concurrency === n ? "bg-[var(--color-primary)] text-[var(--color-on-primary)] shadow-lg" : "opacity-30 hover:opacity-100 hover:bg-white/5"
+                            )}
+                        >
+                            {n}
+                        </button>
+                    ))}
+                </div>
+            </div>
         </div>
       </div>
 
@@ -293,17 +324,24 @@ const YTDLPView: React.FC = () => {
                   <div className="flex flex-col gap-4">
                     <div className="flex items-center justify-between px-2">
                       <h3 className="text-[10px] font-black uppercase tracking-[0.5em] opacity-40">Selected Items ({stagedItems.length})</h3>
-                      <button onClick={() => {
-                        const newItems = stagedItems.map(item => ({ id: item.id, url: item.url, title: item.info.title, uploader: item.info.uploader, status: 'idle' as const }));
-                        setQueue(prev => [...prev, ...newItems]);
-                        setStagedItems([]);
+                      <button onClick={async () => {
+                        const newItems = stagedItems.map(item => ({ 
+                          id: item.id, 
+                          url: item.url, 
+                          title: item.info.title, 
+                          uploader: item.info.uploader, 
+                          status: 'idle' as const,
+                          addedAt: Date.now() 
+                        }));
+                        await db.downloadQueue.bulkAdd(newItems);
+                        await db.stagedItems.clear();
                         setActiveTab('queue');
                       }} className="suite-button suite-button-primary px-8 py-3 text-[9px]">Move to Download Queue</button>
                     </div>
                     <div className="flex flex-col gap-4">
-                       {stagedItems.map(item => (
-                         <IngestStage key={item.id} info={item.info} onRemove={() => setStagedItems(prev => prev.filter(s => s.id !== item.id))} onCommit={() => commitToQueue(item)} isProcessing={isProcessing} />
-                       ))}
+                        {stagedItems.map(item => (
+                          <IngestStage key={item.id} info={item.info} onRemove={() => db.stagedItems.delete(item.id)} onCommit={() => commitToQueue(item)} isProcessing={isProcessing} />
+                        ))}
                     </div>
                   </div>
                 )}
@@ -318,7 +356,7 @@ const YTDLPView: React.FC = () => {
                     <p className="text-[10px] font-black uppercase tracking-[0.4em] opacity-30">{queue.length} Tasks Scheduled</p>
                   </div>
                   <div className="flex items-center gap-4">
-                    <button onClick={() => setQueue([])} className="suite-button-ghost text-red-500 opacity-40 hover:opacity-100">
+                    <button onClick={() => db.downloadQueue.clear()} className="suite-button-ghost text-red-500 opacity-40 hover:opacity-100">
                       <Trash2 className="w-4 h-4" /> Purge Queue
                     </button>
                     <button onClick={processQueue} disabled={isProcessing || queue.length === 0} className="suite-button suite-button-primary px-10 py-4">
@@ -340,8 +378,13 @@ const YTDLPView: React.FC = () => {
                           {item.status === 'processing' ? <Loader2 className="w-5 h-5 animate-spin" /> : item.status === 'success' ? <CheckCircle2 className="w-5 h-5" /> : item.status === 'error' ? <AlertTriangle className="w-5 h-5 text-red-500" /> : <CloudDownload className="w-5 h-5 opacity-20" />}
                         </div>
                         <div className="flex-1 min-w-0">
-                           <h4 className="text-xs font-black uppercase truncate tracking-tight">{item.title || item.url}</h4>
-                           <p className="text-[9px] font-bold opacity-40 uppercase tracking-widest mt-1">{item.uploader || 'Awaiting Metadata'}</p>
+                           <div className="flex items-center justify-between gap-4 mb-1">
+                               <h4 className="text-xs font-black uppercase truncate tracking-tight">{item.title || item.url}</h4>
+                               {item.status === 'processing' && progressMap[item.url] !== undefined && (
+                                   <span className="text-[10px] font-mono text-[var(--color-primary)]">{progressMap[item.url]}%</span>
+                               )}
+                           </div>
+                           <p className="text-[9px] font-bold opacity-40 uppercase tracking-widest">{item.uploader || 'Awaiting Metadata'}</p>
                         </div>
                         {item.status === 'error' && <p className="text-[8px] text-red-500 font-bold uppercase max-w-[200px] truncate">{item.error}</p>}
                       </div>
@@ -360,7 +403,6 @@ const YTDLPView: React.FC = () => {
                 <Activity className="w-4 h-4 text-[var(--color-primary)]" />
                 <span className="text-[10px] font-black uppercase tracking-widest">Feed</span>
               </div>
-              {isProcessing && <div className="text-[10px] font-mono text-[var(--color-primary)]">{overallProgress}%</div>}
            </div>
            
            <div className="flex-1 overflow-y-auto p-6 font-mono text-[9px] custom-scrollbar">
@@ -369,12 +411,6 @@ const YTDLPView: React.FC = () => {
               ))}
               <div ref={logEndRef} />
            </div>
-
-           {isProcessing && (
-              <div className="h-1.5 w-full bg-[var(--color-outline)] relative">
-                <motion.div initial={{ width: 0 }} animate={{ width: `${overallProgress}%` }} className="absolute h-full bg-[var(--color-primary)] shadow-[0_0_15px_var(--color-primary)]" />
-              </div>
-           )}
         </div>
       </div>
     </motion.div>

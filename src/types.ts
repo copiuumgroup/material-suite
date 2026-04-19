@@ -19,4 +19,5 @@ export interface Track {
   needsRelink?: boolean;
   analysis?: AnalysisResult;
   stems?: Stems;
+  dbId?: number;
 }

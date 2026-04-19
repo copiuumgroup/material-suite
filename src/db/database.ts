@@ -45,15 +45,36 @@ export interface ProjectMetadata {
   };
 }
 
+export interface StagedItem {
+  id: string;
+  url: string;
+  info: any;
+  addedAt: number;
+}
+
+export interface QueueItem {
+  id: string;
+  url: string;
+  title?: string;
+  uploader?: string;
+  status: 'idle' | 'processing' | 'success' | 'error';
+  error?: string;
+  addedAt: number;
+}
+
 export class StudioDatabase extends Dexie {
   projects!: Table<ProjectMetadata>;
   impulses!: Table<ImpulseData>;
+  stagedItems!: Table<StagedItem>;
+  downloadQueue!: Table<QueueItem>;
 
   constructor() {
     super('StudioDatabase');
-    this.version(3).stores({
+    this.version(4).stores({
       projects: '++id, name, lastModified, sourceUrl',
-      impulses: '++id, name, addedAt'
+      impulses: '++id, name, addedAt',
+      stagedItems: 'id, url, addedAt',
+      downloadQueue: 'id, url, status, addedAt'
     });
   }
 }

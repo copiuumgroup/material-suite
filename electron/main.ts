@@ -295,7 +295,7 @@ ipcMain.handle('get-metadata', async (_event: IpcMainInvokeEvent, filePath: stri
 ipcMain.handle('ytdlp-get-info', async (_event: IpcMainInvokeEvent, trackUrl: string) => {
   return new Promise((resolve) => {
     // --flat-playlist gives us metadata without downloading
-    const args = ['--dump-json', '--flat-playlist', '--no-warnings', '--', trackUrl];
+    const args = ['--dump-json', '--flat-playlist', '--no-warnings', '--remote-components', 'ejs:github', '--', trackUrl];
     const process = spawn('yt-dlp', args);
     let output = '';
     
@@ -352,6 +352,7 @@ ipcMain.handle('ytdlp-download', async (event: IpcMainInvokeEvent, trackUrl: str
         '-o', path.join(musicPath, '%(uploader)s - %(title)s.%(ext)s'),
         '--embed-thumbnail',
         '--add-metadata',
+        '--remote-components', 'ejs:github',
         '--', // End of options
         trackUrl
       ];
@@ -364,6 +365,7 @@ ipcMain.handle('ytdlp-download', async (event: IpcMainInvokeEvent, trackUrl: str
         '-o', path.join(musicPath, '%(uploader)s - %(title)s.mp4'),
         '--embed-thumbnail',
         '--add-metadata',
+        '--remote-components', 'ejs:github',
         '--', // End of options
         trackUrl
       ];
@@ -391,13 +393,13 @@ ipcMain.handle('ytdlp-download', async (event: IpcMainInvokeEvent, trackUrl: str
     }, 5 * 60 * 1000);
 
     process.stdout.on('data', (data: Buffer) => {
-      win?.webContents.send('ytdlp-log', data.toString());
+      win?.webContents.send('ytdlp-log', { url: trackUrl, data: data.toString() });
     });
 
     process.stderr.on('data', (data: Buffer) => {
       const msg = data.toString();
       errorLog += msg;
-      win?.webContents.send('ytdlp-log', msg);
+      win?.webContents.send('ytdlp-log', { url: trackUrl, data: msg });
     });
 
     process.on('close', (code: number) => {

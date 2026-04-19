@@ -19,7 +19,7 @@ interface ActiveFileMetadata {
 
 const MediaPlayerView: React.FC<Props> = ({ effects, setEffects }) => {
   const [projects, setProjects] = useState<ProjectMetadata[]>([]);
-  const [localFiles, setLocalFiles] = useState<File[]>([]);
+  const [localFiles, setLocalFiles] = useState<{ file: File; metadata?: ActiveFileMetadata }[]>([]);
   const [activeItem, setActiveItem] = useState<{ 
     type: 'vault'; 
     data: ProjectMetadata; 
@@ -64,10 +64,22 @@ const MediaPlayerView: React.FC<Props> = ({ effects, setEffects }) => {
       const files = Array.from(e.target.files).filter(f => 
         f.type.startsWith('video/') || f.type.startsWith('audio/') || 
         f.name.endsWith('.mp3') || f.name.endsWith('.wav') || f.name.endsWith('.mp4') || f.name.endsWith('.m4a')
-      );
+      ).map(f => ({ file: f }));
+      
       setLocalFiles(files);
       setQueueType('local');
-      setIsShuffling(false); // Reset shuffle when new folder loaded
+      setIsShuffling(false);
+
+      // Background metadata extraction
+      files.forEach(async (item, idx) => {
+          const path = (item.file as any).path;
+          if (path && window.electronAPI) {
+              const meta = await window.electronAPI.getMetadata(path);
+              if (meta) {
+                  setLocalFiles(prev => prev.map((f, i) => i === idx ? { ...f, metadata: meta } : f));
+              }
+          }
+      });
     }
   };
 
@@ -141,7 +153,10 @@ const MediaPlayerView: React.FC<Props> = ({ effects, setEffects }) => {
     }
 
     const currentData = activeItem?.data;
-    const idx = list.findIndex(item => item === currentData);
+    const idx = list.findIndex(item => {
+        const itemData = queueType === 'local' ? (item as any).file : item;
+        return itemData === currentData;
+    });
     if (idx !== -1 && idx < list.length - 1) {
         return idx + 1;
     }
@@ -157,7 +172,10 @@ const MediaPlayerView: React.FC<Props> = ({ effects, setEffects }) => {
     }
 
     const currentData = activeItem?.data;
-    const idx = list.findIndex(item => item === currentData);
+    const idx = list.findIndex(item => {
+        const itemData = queueType === 'local' ? (item as any).file : item;
+        return itemData === currentData;
+    });
     if (idx > 0) {
         return idx - 1;
     }
@@ -169,7 +187,7 @@ const MediaPlayerView: React.FC<Props> = ({ effects, setEffects }) => {
     if (nextIdx !== -1) {
         if (isShuffling) setShuffleIndex(prev => prev + 1);
         if (queueType === 'vault') handleSelectVault(projects[nextIdx] as ProjectMetadata);
-        else handleSelectLocal(localFiles[nextIdx] as File);
+        else handleSelectLocal(localFiles[nextIdx].file);
     }
   };
 
@@ -184,7 +202,7 @@ const MediaPlayerView: React.FC<Props> = ({ effects, setEffects }) => {
     if (prevIdx !== -1) {
         if (isShuffling) setShuffleIndex(prev => prev - 1);
         if (queueType === 'vault') handleSelectVault(projects[prevIdx] as ProjectMetadata);
-        else handleSelectLocal(localFiles[prevIdx] as File);
+        else handleSelectLocal(localFiles[prevIdx].file);
     }
   };
 
@@ -202,7 +220,10 @@ const MediaPlayerView: React.FC<Props> = ({ effects, setEffects }) => {
         
         // Find current track's position in shuffle
         const currentData = activeItem?.data;
-        const currentIdx = list.findIndex(item => item === currentData);
+        const currentIdx = list.findIndex(item => {
+            const itemData = queueType === 'local' ? (item as any).file : item;
+            return itemData === currentData;
+        });
         const idxInShuffle = indices.indexOf(currentIdx);
         setShuffleIndex(idxInShuffle !== -1 ? idxInShuffle : 0);
     }
@@ -454,18 +475,20 @@ const MediaPlayerView: React.FC<Props> = ({ effects, setEffects }) => {
                     </button>
                 ))
             ) : (
-                localFiles.map((file, idx) => (
+                localFiles.map((item, idx) => (
                     <button
                         key={idx}
-                        onClick={() => handleSelectLocal(file)}
-                        className={`group w-full text-left p-3 rounded-[var(--radius-element)] flex items-center gap-3 transition-all border ${activeItem?.type === 'local' && activeItem.data === file ? 'bg-[var(--color-primary)]/10 border-[var(--color-primary)]/30' : 'border-transparent hover:bg-[var(--color-surface-variant)]'}`}
+                        onClick={() => handleSelectLocal(item.file)}
+                        className={`group w-full text-left p-3 rounded-[var(--radius-element)] flex items-center gap-3 transition-all border ${activeItem?.type === 'local' && activeItem.data === item.file ? 'bg-[var(--color-primary)]/10 border-[var(--color-primary)]/30' : 'border-transparent hover:bg-[var(--color-surface-variant)]'}`}
                     >
                         <div className="w-10 h-10 rounded shadow-md overflow-hidden bg-[var(--color-surface)] border border-[var(--color-outline)] shrink-0 flex items-center justify-center transition-transform group-hover:scale-110">
-                           <ListMusic className="w-5 h-5 opacity-20" />
+                           {item.metadata?.coverArt ? (
+                               <img src={item.metadata.coverArt} className="w-full h-full object-cover" />
+                           ) : <ListMusic className="w-5 h-5 opacity-20" />}
                         </div>
                         <div className="flex flex-col flex-1 min-w-0">
-                            <span className="text-xs font-bold uppercase truncate text-[var(--color-on-surface)] group-hover:text-[var(--color-primary)] transition-colors">{file.name}</span>
-                            <span className="text-[8px] tracking-widest opacity-40 uppercase">Offline Node</span>
+                            <span className="text-xs font-bold uppercase truncate text-[var(--color-on-surface)] group-hover:text-[var(--color-primary)] transition-colors">{item.metadata?.title || item.file.name}</span>
+                            <span className="text-[8px] tracking-widest opacity-40 uppercase truncate">{item.metadata?.artist || 'Offline Node'}</span>
                         </div>
                     </button>
                 ))

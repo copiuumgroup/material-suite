@@ -66,7 +66,7 @@
       "target": [
         "portable"
       ],
-      "artifactName": "Material Suite-dev-1eq0p.${ext}"
+      "artifactName": "Material Suite-dev-a9pfs.${ext}"
     },
     "nsis": {
       "oneClick": false,
@@ -74,13 +74,13 @@
       "createDesktopShortcut": true,
       "createStartMenuShortcut": true,
       "shortcutName": "Material Suite",
-      "artifactName": "Material Suite-dev-1eq0p.${ext}"
+      "artifactName": "Material Suite-dev-a9pfs.${ext}"
     },
     "msi": {
       "oneClick": false,
       "perMachine": true,
       "shortcutName": "Material Studio",
-      "artifactName": "Material Suite-dev-1eq0p.${ext}"
+      "artifactName": "Material Suite-dev-a9pfs.${ext}"
     }
   }
 }

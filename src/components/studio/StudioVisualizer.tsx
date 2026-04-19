@@ -44,7 +44,7 @@ const StudioVisualizer: React.FC<Props> = ({ analyser }) => {
         const percent = i / barCount;
         const sampleIdx = Math.floor(Math.pow(percent, 1.3) * bufferLength * 0.6);
         const rawHeight = (dataArray[sampleIdx] / 255) * height * 0.9;
-        
+
         smoothedHeights.current[i] += (rawHeight - smoothedHeights.current[i]) * 0.2;
         const h = Math.max(2, smoothedHeights.current[i]);
         const x = i * (barWidth + totalPad) + totalPad;

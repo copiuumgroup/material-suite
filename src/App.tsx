@@ -137,12 +137,25 @@ function App() {
     }
   }, [theme]);
 
-  // Sync Analysis to Effects
   useEffect(() => {
     if (activeTrack?.analysis) {
         setEffects(prev => ({ ...prev, analysis: activeTrack.analysis }));
     }
   }, [activeTrackId, tracks]);
+
+  // Sync Effects to Database (Auto-Save)
+  useEffect(() => {
+    const activeProject = tracks.find(t => t.id === activeTrackId);
+    if (activeProject?.dbId) {
+        const timer = setTimeout(async () => {
+            await db.projects.update(activeProject.dbId!, { 
+                settings: effects as any,
+                lastModified: Date.now()
+            });
+        }, 1000); // Throttled auto-save
+        return () => clearTimeout(timer);
+    }
+  }, [effects, activeTrackId]);
 
   const [impulses, setImpulses] = useState<ImpulseData[]>([]);
 
@@ -253,9 +266,25 @@ function App() {
           const path = (track.file as any).path;
           if (path) {
             const meta = await window.electronAPI.getMetadata(path);
-            if (meta) setTracks((prev: Track[]) => prev.map((t: Track) => t.id === track.id ? { ...t, metadata: meta } : t));
             const internalPath = await window.electronAPI.cacheAudioFile(path, track.file.name);
-            if (internalPath) setTracks((prev: Track[]) => prev.map((t: Track) => t.id === track.id ? { ...t, internalPath } : t));
+            
+            // Create in DB
+            const dbId = await db.projects.add({
+                name: meta?.title || track.file.name,
+                artist: meta?.artist,
+                coverArt: meta?.coverArt,
+                filePath: path,
+                lastModified: Date.now(),
+                settings: effects as any,
+                mediaType: track.file.type.includes('video') ? 'video' : 'audio'
+            });
+
+            setTracks((prev: Track[]) => prev.map((t: Track) => t.id === track.id ? { 
+                ...t, 
+                metadata: meta || undefined,
+                internalPath: internalPath || undefined,
+                dbId: dbId as number
+            } : t));
           }
         }
       });
@@ -325,12 +354,19 @@ function App() {
       buffer: null,
       isReady: false,
       needsRelink,
+      dbId: project.id,
       metadata: {
         title: project.name,
         artist: project.artist,
         coverArt: project.coverArt
-      }
+      },
+      stems: project.stems as any
     };
+
+    if (project.settings) {
+        setEffects(project.settings as any);
+    }
+
     setTracks([loadedTrack]);
     setActiveTrackId(loadedTrack.id);
     setCurrentView('studio');

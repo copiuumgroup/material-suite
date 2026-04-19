@@ -1,4 +1,4 @@
-type LogCallback = (data: string) => void;
+type LogCallback = (data: any) => void;
 
 class MaterialStudioAPI {
   private studioLogListeners: Set<LogCallback> = new Set();
@@ -8,8 +8,8 @@ class MaterialStudioAPI {
   private constructor() {
     // Initialize listeners for native bridge
     if (window.electronAPI) {
-      window.electronAPI.onYtdlpLog((data) => {
-        this.emitDownloadLog(data);
+      window.electronAPI.onYtdlpLog((payload) => {
+        this.emitDownloadLog(payload);
       });
     }
   }
